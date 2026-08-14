@@ -1,0 +1,16 @@
+name: DailyBoard
+options:
+  bundleIdPrefix: com.seraphim.dailyboard
+targets:
+  DailyBoard:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources: [Sources]
+    dependencies:
+      - framework: ../../shared/task-board/build/bin/iosSimulatorArm64/debugFramework/TaskBoardShared.framework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.seraphim.dailyboard.ios
+        CODE_SIGNING_ALLOWED: NO

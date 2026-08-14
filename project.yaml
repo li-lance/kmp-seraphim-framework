@@ -1,0 +1,11 @@
+schema: 1
+product:
+  id: daily-board
+  package: com.seraphim.dailyboard
+platforms:
+  android: true
+  ios: true
+  desktop: false
+  web: false
+data:
+  strategy: local-only
