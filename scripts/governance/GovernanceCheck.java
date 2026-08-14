@@ -708,7 +708,7 @@ public final class GovernanceCheck {
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                if (attributes.isRegularFile() && file.toString().endsWith(".md")) {
+                if (Files.isRegularFile(file) && file.toString().endsWith(".md")) {
                     markdown.add(file);
                 }
                 return FileVisitResult.CONTINUE;

@@ -7,6 +7,7 @@ public final class GovernanceCheckTest {
     public static void main(String[] args) throws Exception {
         acceptsValidBaseline();
         ignoresRepositoryLocalScratchRoots();
+        scansGovernedMarkdownFileSymlinks();
         unavailableSurfacesNamePhaseAndActivation();
         focusedModeNormalizesChangedPaths();
         wrapperRunsFromNestedDirectory();
@@ -119,6 +120,22 @@ public final class GovernanceCheckTest {
             throw new AssertionError(
                 "Nested wrapper invocation failed with exit " + exitCode + ":\n" + output
             );
+        }
+    }
+
+    private static void scansGovernedMarkdownFileSymlinks() throws Exception {
+        Path root = fixture();
+        Path externalMarkdown = Files.createTempFile("governance-linked-", ".md");
+        try {
+            Files.writeString(externalMarkdown, "# Linked\n\n[broken](missing.md)\n");
+            Files.createSymbolicLink(root.resolve("docs/linked.md"), externalMarkdown);
+            assertState(
+                GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+                "markdown-links",
+                GovernanceCheck.State.FAIL
+            );
+        } finally {
+            Files.deleteIfExists(externalMarkdown);
         }
     }
 
