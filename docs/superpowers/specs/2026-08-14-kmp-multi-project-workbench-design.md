@@ -1,7 +1,9 @@
 # KMP Multi-Project Workbench Design
 
-**Status:** Approved design, revised after architecture audit on 2026-08-14  
-**Repository:** `kmp-seraphim-framework`  
+**Status:** Approved design, revised after architecture audit on 2026-08-14
+
+**Repository:** `kmp-seraphim-framework`
+
 **Reference product:** `daily-board`
 
 ## 1. Objective

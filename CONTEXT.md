@@ -40,4 +40,3 @@ KMP Seraphim Workbench 是一个 manifest 驱动的多项目工作台。它生�
 - **Phase 1**：四端本地任务看板、持久化、Desktop、Web/Wasm、独立 CLI 导出。
 - **Phase 2**：账户、Ktor/PostgreSQL、离线同步与冲突处理。
 - **Phase 3**：模板产品化、迁移工具、第二个真实产品。
-
