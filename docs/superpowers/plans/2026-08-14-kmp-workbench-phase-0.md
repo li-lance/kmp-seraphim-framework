@@ -613,7 +613,7 @@ object ManifestValidator {
 
 ```bash
 ./gradlew :tooling:generator:test --tests '*ManifestTest'
-git add tooling/generator
+git add tooling/AGENTS.md tooling/generator
 git commit -m "feat: validate Phase 0 product manifests"
 ```
 
@@ -1107,7 +1107,7 @@ struct ContentView: View {
 - [ ] **Step 5: Commit the product template**
 
 ```bash
-git add templates/daily-board-base
+git add templates/AGENTS.md templates/daily-board-base
 git commit -m "feat: add native UI daily-board template"
 ```
 
@@ -1226,7 +1226,7 @@ Expected: tests pass and the second command prints `Rendered daily-board` withou
 - [ ] **Step 5: Commit the entry point and rendered reference product**
 
 ```bash
-git add build.gradle.kts project.yaml tooling/generator products/daily-board
+git add build.gradle.kts project.yaml tooling/generator products/AGENTS.md products/daily-board
 git commit -m "feat: render the daily-board reference product"
 ```
 
