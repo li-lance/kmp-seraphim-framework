@@ -27,7 +27,9 @@ Run Module tests, Render, and Certify commands required by the nearest scoped in
 
 ## CI responsibility
 
-CI calls `./scripts/check.sh full` and owns the complete matrix for currently supported hosts and platforms. Workflow YAML invokes repository commands; it does not duplicate validation logic.
+The `Governance` workflow runs `./scripts/check.sh full` and the validator regression test on pull requests and pushes to `master`. Workflow YAML invokes repository commands and does not duplicate validation logic.
+
+Platform build and certification workflows are added by the owning implementation plans. CI owns their complete matrix for currently supported hosts and platforms.
 
 ## Decision records
 
