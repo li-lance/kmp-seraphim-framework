@@ -13,16 +13,11 @@ The repository currently contains approved designs and implementation plans. Do 
 - Implementation follows the approved plan in [docs/superpowers/plans/](docs/superpowers/plans/).
 - When `platform-kit/`, `tooling/`, `templates/`, or `products/` exists, read its nearest `AGENTS.md` before editing it.
 
-## Standing invariants
+## Standing orders
 
-- UI is never shared between Android, iOS, Desktop, and Web applications.
-- Platform-kit owns build policy and never selects product platforms or Module topology.
-- The manifest is declarative and never embeds Gradle or shell code.
-- Render validates and publishes structure atomically; Certify proves selected platform builds.
-- A generated product never includes an unselected platform in its Gradle Module graph.
-- A template becomes supported only after clean generation and certification of every claimed platform combination.
-- Architecture facts, decision rationale, reusable procedures, and implementation plans each have one authoritative home.
-- Missing or unavailable verification is reported explicitly and never presented as passing.
+- Follow the authoritative [project invariants](CONTEXT.md#invariants); link to their owner instead of copying them into instructions.
+- Keep architecture facts, decision rationale, reusable procedures, and implementation plans in their routed authoritative homes.
+- Report missing or unavailable verification explicitly and never present it as passing.
 
 ## Verification
 

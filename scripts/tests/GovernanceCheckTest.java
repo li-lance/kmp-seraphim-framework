@@ -6,13 +6,29 @@ import java.util.List;
 public final class GovernanceCheckTest {
     public static void main(String[] args) throws Exception {
         acceptsValidBaseline();
+        unavailableSurfacesNamePhaseAndActivation();
+        focusedModeNormalizesChangedPaths();
+        wrapperRunsFromNestedDirectory();
         rejectsRegularClaudeFile();
         rejectsBrokenMarkdownLink();
+        rejectsBrokenReferenceLink();
+        acceptsReferenceLinksAndOptionalTitles();
+        acceptsBalancedParenthesesInDestinations();
         ignoresLinksInsideCodeFences();
+        ignoresLinksInsideInlineCode();
         rejectsBrokenMarkdownAnchor();
+        acceptsSetextHeadingAnchors();
+        supportsDuplicateHeadingSuffixes();
+        rejectsMissingDuplicateHeadingSuffix();
+        rejectsMalformedInlineLinkSyntax();
         rejectsDuplicateContextOwnership();
         rejectsOversizedRootInstructions();
         rejectsMalformedAgentNote();
+        rejectsInexactAgentNoteOpeningLine();
+        rejectsAgentNoteStatusOnlyLater();
+        rejectsNearMatchAgentNoteHeading();
+        rejectsFencedAgentNoteHeadingExample();
+        rejectsOutOfOrderAgentNoteHeadings();
         requiresScopedInstructionsWhenSurfaceExists();
         System.out.println("GovernanceCheckTest: PASS");
     }
@@ -36,6 +52,51 @@ public final class GovernanceCheckTest {
         );
     }
 
+    private static void unavailableSurfacesNamePhaseAndActivation() throws Exception {
+        Path root = fixture();
+        List<GovernanceCheck.Result> results =
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of());
+        assertDetail(
+            results,
+            "platform-kit-instructions",
+            "Phase 0; activate when platform-kit/src exists"
+        );
+        assertDetail(
+            results,
+            "tooling-instructions",
+            "Phase 0; activate when tooling/generator/src exists"
+        );
+        assertDetail(
+            results,
+            "templates-instructions",
+            "Phase 0; activate when templates exists"
+        );
+        assertDetail(
+            results,
+            "products-instructions",
+            "Phase 0; activate when products exists"
+        );
+    }
+
+    private static void wrapperRunsFromNestedDirectory() throws Exception {
+        Path repositoryRoot = Path.of(".").toAbsolutePath().normalize();
+        Process process = new ProcessBuilder(
+            repositoryRoot.resolve("scripts/check.sh").toString(),
+            "focused",
+            "docs/development.md"
+        )
+            .directory(repositoryRoot.resolve("docs").toFile())
+            .redirectErrorStream(true)
+            .start();
+        String output = new String(process.getInputStream().readAllBytes());
+        int exitCode = process.waitFor();
+        if (exitCode != 0 || !output.contains("PASS agent-layout")) {
+            throw new AssertionError(
+                "Nested wrapper invocation failed with exit " + exitCode + ":\n" + output
+            );
+        }
+    }
+
     private static void rejectsBrokenMarkdownLink() throws Exception {
         Path root = fixture();
         Files.writeString(root.resolve("docs/development.md"), "# Development\n\n[missing](missing.md)\n");
@@ -55,11 +116,113 @@ public final class GovernanceCheckTest {
         assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
     }
 
+    private static void rejectsBrokenReferenceLink() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[Architecture][architecture-ref]\n\n" +
+                "[architecture-ref]: missing.md \"Architecture\"\n"
+        );
+        assertState(
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+            "markdown-links",
+            GovernanceCheck.State.FAIL
+        );
+    }
+
+    private static void acceptsReferenceLinksAndOptionalTitles() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[Architecture][architecture-ref] and [Architecture][].\n\n" +
+                "[architecture-ref]: architecture.md \"Architecture title\"\n" +
+                "[architecture]: <architecture.md> 'Collapsed title'\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
+    private static void acceptsBalancedParenthesesInDestinations() throws Exception {
+        Path root = fixture();
+        write(root, "docs/guide(v1).md", "# Guide\n");
+        write(root, "docs/guide (v2).md", "# Guide\n");
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[one](guide(v1).md \"Title\") " +
+                "[two](<guide (v2).md> 'Other title')\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
+    private static void ignoresLinksInsideInlineCode() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\nUse `[fixture](missing.md)` as an example.\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
     private static void rejectsBrokenMarkdownAnchor() throws Exception {
         Path root = fixture();
         Files.writeString(
             root.resolve("docs/development.md"),
             "# Development\n\n[missing section](architecture.md#missing-section)\n"
+        );
+        assertState(
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+            "markdown-links",
+            GovernanceCheck.State.FAIL
+        );
+    }
+
+    private static void acceptsSetextHeadingAnchors() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/architecture.md"),
+            "Architecture\n============\n\nExtension Points\n----------------\n"
+        );
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[extension](architecture.md#extension-points)\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
+    private static void supportsDuplicateHeadingSuffixes() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/architecture.md"),
+            "# Architecture\n\n## Repeat\n\n## Repeat\n"
+        );
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[second](architecture.md#repeat-1)\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
+    private static void rejectsMissingDuplicateHeadingSuffix() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/architecture.md"),
+            "# Architecture\n\n## Repeat\n\n## Repeat\n"
+        );
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[third](architecture.md#repeat-2)\n"
+        );
+        assertState(
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+            "markdown-links",
+            GovernanceCheck.State.FAIL
+        );
+    }
+
+    private static void rejectsMalformedInlineLinkSyntax() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[bad](architecture.md \"unterminated)\n"
         );
         assertState(
             GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
@@ -103,6 +266,87 @@ public final class GovernanceCheckTest {
         );
     }
 
+    private static void rejectsAgentNoteStatusOnlyLater() throws Exception {
+        Path root = fixture();
+        writeAgentNote(
+            root,
+            "# Agent Note: Example\n\nIntro before status.\n\nStatus: implemented\n\n" +
+                implementedNoteSections()
+        );
+        assertAgentNotesFail(root);
+    }
+
+    private static void rejectsInexactAgentNoteOpeningLine() throws Exception {
+        Path root = fixture();
+        writeAgentNote(
+            root,
+            "# Agent Note: Example  \n\nStatus: implemented\n\n" + implementedNoteSections()
+        );
+        assertAgentNotesFail(root);
+    }
+
+    private static void rejectsNearMatchAgentNoteHeading() throws Exception {
+        Path root = fixture();
+        writeAgentNote(
+            root,
+            "# Agent Note: Example\n\nStatus: implemented\n\n" +
+                "## Problematic\n\nNot the required heading.\n\n" +
+                "## Decision\n\nDecision.\n\n" +
+                "## Alternatives considered\n\nAlternative.\n\n" +
+                "## Consequences\n\nConsequence.\n"
+        );
+        assertAgentNotesFail(root);
+    }
+
+    private static void rejectsFencedAgentNoteHeadingExample() throws Exception {
+        Path root = fixture();
+        writeAgentNote(
+            root,
+            "# Agent Note: Example\n\nStatus: implemented\n\n" +
+                "```markdown\n## Problem\n```\n\n" +
+                "## Decision\n\nDecision.\n\n" +
+                "## Alternatives considered\n\nAlternative.\n\n" +
+                "## Consequences\n\nConsequence.\n"
+        );
+        assertAgentNotesFail(root);
+    }
+
+    private static void rejectsOutOfOrderAgentNoteHeadings() throws Exception {
+        Path root = fixture();
+        writeAgentNote(
+            root,
+            "# Agent Note: Example\n\nStatus: implemented\n\n" +
+                "## Decision\n\nDecision.\n\n" +
+                "## Problem\n\nProblem.\n\n" +
+                "## Alternatives considered\n\nAlternative.\n\n" +
+                "## Consequences\n\nConsequence.\n"
+        );
+        assertAgentNotesFail(root);
+    }
+
+    private static String implementedNoteSections() {
+        return "## Problem\n\nProblem.\n\n" +
+            "## Decision\n\nDecision.\n\n" +
+            "## Alternatives considered\n\nAlternative.\n\n" +
+            "## Consequences\n\nConsequence.\n";
+    }
+
+    private static void writeAgentNote(Path root, String content) throws IOException {
+        write(
+            root,
+            ".agents/notes/implemented/process/2026-08-14-example.md",
+            content
+        );
+    }
+
+    private static void assertAgentNotesFail(Path root) throws IOException {
+        assertState(
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+            "agent-notes",
+            GovernanceCheck.State.FAIL
+        );
+    }
+
     private static void requiresScopedInstructionsWhenSurfaceExists() throws Exception {
         Path root = fixture();
         Files.createDirectories(root.resolve("tooling/generator/src"));
@@ -111,6 +355,22 @@ public final class GovernanceCheckTest {
             "tooling-instructions",
             GovernanceCheck.State.FAIL
         );
+    }
+
+    private static void focusedModeNormalizesChangedPaths() throws Exception {
+        Path root = fixture();
+        Files.createDirectories(root.resolve("tooling/generator/src"));
+        for (String changedPath : List.of(
+            "tooling/generator/src/Main.kt",
+            "./tooling/generator/src/Main.kt",
+            root.resolve("tooling/generator/src/Main.kt").toString()
+        )) {
+            assertState(
+                GovernanceCheck.run(root, GovernanceCheck.Mode.FOCUSED, List.of(changedPath)),
+                "tooling-instructions",
+                GovernanceCheck.State.FAIL
+            );
+        }
     }
 
     private static Path fixture() throws IOException {
@@ -149,6 +409,20 @@ public final class GovernanceCheckTest {
             .orElseThrow(() -> new AssertionError("Missing result: " + name));
         if (result.state() != expected) {
             throw new AssertionError(name + " expected " + expected + " but was " + result);
+        }
+    }
+
+    private static void assertDetail(
+        List<GovernanceCheck.Result> results,
+        String name,
+        String expected
+    ) {
+        GovernanceCheck.Result result = results.stream()
+            .filter(candidate -> candidate.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing result: " + name));
+        if (!result.detail().equals(expected)) {
+            throw new AssertionError(name + " expected detail '" + expected + "' but was " + result);
         }
     }
 }

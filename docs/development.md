@@ -16,6 +16,10 @@ During iteration, pass the affected paths to the focused governance check:
 ./scripts/check.sh focused docs tooling
 ```
 
+Command examples run from the repository root. The governance wrapper resolves that root from its own location, so an absolute invocation of `scripts/check.sh` also works from a nested directory. Focused paths may be repository-relative, `./`-prefixed, or absolute paths inside the repository.
+
+Markdown validation ignores fenced and inline code examples. It resolves inline links with balanced destinations and optional titles, full or collapsed reference links and definitions, and anchors from simple ATX or setext headings with duplicate suffixes. Malformed or unsupported relative inline-link syntax fails with a source line and reason.
+
 Before completing a governance or repository-wide change, run:
 
 ```sh

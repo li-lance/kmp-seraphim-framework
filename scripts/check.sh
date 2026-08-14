@@ -9,6 +9,8 @@ fi
 mode=$1
 shift
 
+repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
 case "$mode" in
   focused|full) ;;
   *)
@@ -17,4 +19,5 @@ case "$mode" in
     ;;
 esac
 
+cd "$repository_root"
 exec java scripts/governance/GovernanceCheck.java "$mode" "$@"

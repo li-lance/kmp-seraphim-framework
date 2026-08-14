@@ -5,8 +5,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -16,7 +21,11 @@ public final class GovernanceCheck {
     enum State { PASS, FAIL, UNAVAILABLE }
     record Result(String name, State state, String detail) {}
 
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^]]*]\\(([^)]+)\\)");
+    private static final Pattern ATX_HEADING = Pattern.compile(
+        "^ {0,3}(#{1,6})(?:[ \\t]+|$)(.*)$"
+    );
+    private static final Pattern SETEXT_HEADING = Pattern.compile("^ {0,3}(?:=+|-+)[ \\t]*$");
+    private static final Pattern URI_SCHEME = Pattern.compile("^[A-Za-z][A-Za-z0-9+.-]*:.*");
     private static final List<String> REQUIRED_DOCUMENTS = List.of(
         "AGENTS.md",
         "CONTEXT.md",
@@ -46,6 +55,11 @@ public final class GovernanceCheck {
     }
 
     static List<Result> run(Path root, Mode mode, List<String> changedPaths) throws IOException {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        List<String> normalizedChangedPaths = changedPaths.stream()
+            .map(changedPath -> normalizeChangedPath(normalizedRoot, changedPath))
+            .toList();
+        root = normalizedRoot;
         List<Result> results = new ArrayList<>();
         results.add(checkAgentLayout(root));
         results.add(checkRequiredDocuments(root));
@@ -61,11 +75,22 @@ public final class GovernanceCheck {
             new Surface("products", "products", "products/AGENTS.md")
         );
         for (Surface surface : surfaces) {
-            if (mode == Mode.FULL || changedPaths.isEmpty() || changedPaths.stream().anyMatch(surface::matches)) {
+            if (mode == Mode.FULL || normalizedChangedPaths.isEmpty()
+                || normalizedChangedPaths.stream().anyMatch(surface::matches)) {
                 results.add(checkSurfaceInstructions(root, surface));
             }
         }
         return results;
+    }
+
+    private static String normalizeChangedPath(Path root, String changedPath) {
+        Path supplied = Path.of(changedPath.replace('\\', '/'));
+        Path absolute = supplied.isAbsolute()
+            ? supplied.normalize()
+            : root.resolve(supplied).normalize();
+        return absolute.startsWith(root)
+            ? root.relativize(absolute).toString().replace('\\', '/')
+            : absolute.toString().replace('\\', '/');
     }
 
     private static Result checkAgentLayout(Path root) throws IOException {
@@ -95,15 +120,11 @@ public final class GovernanceCheck {
     private static Result checkMarkdownLinks(Path root) throws IOException {
         List<String> errors = new ArrayList<>();
         for (Path markdown : markdownFiles(root)) {
-            Matcher matcher = MARKDOWN_LINK.matcher(outsideFencedBlocks(Files.readString(markdown)));
-            while (matcher.find()) {
-                String destination = matcher.group(1).trim();
-                if (destination.startsWith("http://") || destination.startsWith("https://")
-                    || destination.startsWith("mailto:")) {
+            String content = outsideFencedBlocks(Files.readString(markdown));
+            for (MarkdownDestination parsed : markdownDestinations(content, markdown, root, errors)) {
+                String destination = parsed.value();
+                if (URI_SCHEME.matcher(destination).matches() || destination.startsWith("//")) {
                     continue;
-                }
-                if (destination.startsWith("<") && destination.endsWith(">")) {
-                    destination = destination.substring(1, destination.length() - 1);
                 }
                 String[] parts = destination.split("#", 2);
                 String pathPart = parts[0];
@@ -112,30 +133,52 @@ public final class GovernanceCheck {
                     ? markdown
                     : markdown.getParent().resolve(pathPart).normalize();
                 if (!target.startsWith(root) || !Files.exists(target)) {
-                    errors.add(root.relativize(markdown) + " -> " + destination);
+                    errors.add(root.relativize(markdown) + ":" + parsed.line() + " -> " + destination);
                 } else if (parts.length == 2 && !parts[1].isEmpty()
                     && Files.isRegularFile(target) && target.toString().endsWith(".md")
                     && !hasAnchor(target, URLDecoder.decode(parts[1], StandardCharsets.UTF_8))) {
-                    errors.add(root.relativize(markdown) + " -> missing anchor " + destination);
+                    errors.add(root.relativize(markdown) + ":" + parsed.line()
+                        + " -> missing anchor " + destination);
                 }
             }
         }
         return errors.isEmpty()
-            ? pass("markdown-links", "all relative document targets exist")
+            ? pass("markdown-links", "all supported relative Markdown links and anchors resolve")
             : fail("markdown-links", String.join("; ", errors));
     }
 
     private static boolean hasAnchor(Path markdown, String expected) throws IOException {
-        return outsideFencedBlocks(Files.readString(markdown)).lines()
-            .filter(line -> line.matches("^#{1,6}\\s+.+"))
-            .map(GovernanceCheck::headingAnchor)
-            .anyMatch(expected::equals);
+        return headingAnchors(outsideFencedBlocks(Files.readString(markdown))).contains(expected);
     }
 
-    private static String headingAnchor(String heading) {
-        String text = heading.replaceFirst("^#{1,6}\\s+", "")
-            .toLowerCase(Locale.ROOT)
-            .replace("`", "");
+    private static Set<String> headingAnchors(String markdown) {
+        String[] lines = markdown.split("\\R", -1);
+        List<String> headings = new ArrayList<>();
+        for (int index = 0; index < lines.length; index++) {
+            Matcher atx = ATX_HEADING.matcher(lines[index]);
+            if (atx.matches()) {
+                String heading = atx.group(2).strip();
+                heading = heading.replaceFirst("[ \\t]+#+[ \\t]*$", "");
+                headings.add(heading);
+            } else if (index + 1 < lines.length && !lines[index].isBlank()
+                && SETEXT_HEADING.matcher(lines[index + 1]).matches()) {
+                headings.add(lines[index].strip());
+                index++;
+            }
+        }
+        Map<String, Integer> occurrences = new HashMap<>();
+        Set<String> anchors = new HashSet<>();
+        for (String heading : headings) {
+            String base = headingAnchor(heading);
+            int occurrence = occurrences.getOrDefault(base, 0);
+            anchors.add(occurrence == 0 ? base : base + "-" + occurrence);
+            occurrences.put(base, occurrence + 1);
+        }
+        return anchors;
+    }
+
+    private static String headingAnchor(String text) {
+        text = text.toLowerCase(Locale.ROOT).replace("`", "").strip();
         StringBuilder slug = new StringBuilder();
         for (int index = 0; index < text.length(); index++) {
             char character = text.charAt(index);
@@ -147,6 +190,296 @@ public final class GovernanceCheck {
         }
         return slug.toString().replaceAll("-+", "-");
     }
+
+    private static List<MarkdownDestination> markdownDestinations(
+        String markdown,
+        Path source,
+        Path root,
+        List<String> errors
+    ) {
+        String masked = maskInlineCode(markdown);
+        String[] lines = masked.split("\\R", -1);
+        Map<String, MarkdownDestination> definitions = new LinkedHashMap<>();
+        Set<Integer> definitionLines = new HashSet<>();
+        String relative = root.relativize(source).toString();
+
+        for (int index = 0; index < lines.length; index++) {
+            ReferenceDefinition definition = parseReferenceDefinition(lines[index], index + 1);
+            if (definition == null) {
+                continue;
+            }
+            definitionLines.add(index);
+            if (definition.error() != null) {
+                errors.add(relative + ":" + (index + 1) + " -> " + definition.error());
+            } else {
+                definitions.putIfAbsent(definition.label(), definition.destination());
+            }
+        }
+
+        List<MarkdownDestination> destinations = new ArrayList<>(definitions.values());
+        for (int index = 0; index < lines.length; index++) {
+            if (!definitionLines.contains(index)) {
+                scanInlineLinks(lines[index], index + 1, relative, definitions, destinations, errors);
+            }
+        }
+        return destinations;
+    }
+
+    private static ReferenceDefinition parseReferenceDefinition(String line, int lineNumber) {
+        int start = 0;
+        while (start < line.length() && start < 4 && line.charAt(start) == ' ') {
+            start++;
+        }
+        if (start > 3 || start >= line.length() || line.charAt(start) != '[') {
+            return null;
+        }
+        int close = findClosingBracket(line, start);
+        if (close < 0 || close + 1 >= line.length() || line.charAt(close + 1) != ':') {
+            return null;
+        }
+        String label = normalizeReferenceLabel(line.substring(start + 1, close));
+        DestinationParse parsed = parseDestination(line.substring(close + 2));
+        if (label.isEmpty()) {
+            return new ReferenceDefinition(label, null, "reference definition has an empty label");
+        }
+        if (parsed.error() != null) {
+            return new ReferenceDefinition(label, null, "malformed reference definition: " + parsed.error());
+        }
+        return new ReferenceDefinition(
+            label,
+            new MarkdownDestination(parsed.destination(), lineNumber),
+            null
+        );
+    }
+
+    private static void scanInlineLinks(
+        String line,
+        int lineNumber,
+        String source,
+        Map<String, MarkdownDestination> definitions,
+        List<MarkdownDestination> destinations,
+        List<String> errors
+    ) {
+        for (int index = 0; index < line.length(); index++) {
+            if (line.charAt(index) != '[' || isEscaped(line, index)) {
+                continue;
+            }
+            int close = findClosingBracket(line, index);
+            if (close < 0) {
+                continue;
+            }
+            String text = line.substring(index + 1, close);
+            int next = close + 1;
+            if (next < line.length() && line.charAt(next) == '(') {
+                int end = findClosingParenthesis(line, next);
+                if (end < 0) {
+                    errors.add(source + ":" + lineNumber + " -> malformed inline link: unclosed destination");
+                    index = close;
+                    continue;
+                }
+                DestinationParse parsed = parseDestination(line.substring(next + 1, end));
+                if (parsed.error() != null) {
+                    errors.add(source + ":" + lineNumber + " -> malformed inline link: " + parsed.error());
+                } else {
+                    destinations.add(new MarkdownDestination(parsed.destination(), lineNumber));
+                }
+                index = end;
+            } else if (next < line.length() && line.charAt(next) == '[') {
+                int referenceEnd = findClosingBracket(line, next);
+                if (referenceEnd < 0) {
+                    errors.add(source + ":" + lineNumber + " -> malformed reference link: unclosed label");
+                    index = close;
+                    continue;
+                }
+                String explicit = line.substring(next + 1, referenceEnd);
+                String label = normalizeReferenceLabel(explicit.isEmpty() ? text : explicit);
+                MarkdownDestination destination = definitions.get(label);
+                if (destination == null) {
+                    errors.add(source + ":" + lineNumber + " -> undefined reference link [" + label + "]");
+                } else {
+                    destinations.add(destination.withLine(lineNumber));
+                }
+                index = referenceEnd;
+            } else {
+                MarkdownDestination destination = definitions.get(normalizeReferenceLabel(text));
+                if (destination != null) {
+                    destinations.add(destination.withLine(lineNumber));
+                }
+                index = close;
+            }
+        }
+    }
+
+    private static DestinationParse parseDestination(String expression) {
+        int index = skipWhitespace(expression, 0);
+        if (index == expression.length()) {
+            return new DestinationParse(null, "destination is empty");
+        }
+        String destination;
+        if (expression.charAt(index) == '<') {
+            int end = findUnescaped(expression, '>', index + 1);
+            if (end < 0) {
+                return new DestinationParse(null, "angle-bracket destination is unclosed");
+            }
+            destination = expression.substring(index + 1, end);
+            index = end + 1;
+        } else {
+            int start = index;
+            int depth = 0;
+            while (index < expression.length()) {
+                char character = expression.charAt(index);
+                if (character == '\\' && index + 1 < expression.length()) {
+                    index += 2;
+                    continue;
+                }
+                if (character == '(') {
+                    depth++;
+                } else if (character == ')') {
+                    if (depth == 0) {
+                        return new DestinationParse(null, "destination has an unmatched parenthesis");
+                    }
+                    depth--;
+                } else if (Character.isWhitespace(character) && depth == 0) {
+                    break;
+                }
+                index++;
+            }
+            if (depth != 0) {
+                return new DestinationParse(null, "destination has unbalanced parentheses");
+            }
+            destination = expression.substring(start, index);
+        }
+        if (destination.isEmpty()) {
+            return new DestinationParse(null, "destination is empty");
+        }
+        index = skipWhitespace(expression, index);
+        if (index < expression.length()) {
+            char opener = expression.charAt(index);
+            char closer = opener == '(' ? ')' : opener;
+            if (!(opener == '\"' || opener == '\'' || opener == '(')) {
+                return new DestinationParse(null, "unsupported text after destination");
+            }
+            int titleEnd = findUnescaped(expression, closer, index + 1);
+            if (titleEnd < 0) {
+                return new DestinationParse(null, "optional title is unclosed");
+            }
+            index = skipWhitespace(expression, titleEnd + 1);
+            if (index != expression.length()) {
+                return new DestinationParse(null, "unsupported text after optional title");
+            }
+        }
+        return new DestinationParse(unescapeMarkdown(destination), null);
+    }
+
+    private static int findClosingBracket(String value, int open) {
+        int depth = 1;
+        for (int index = open + 1; index < value.length(); index++) {
+            if (isEscaped(value, index)) {
+                continue;
+            }
+            if (value.charAt(index) == '[') {
+                depth++;
+            } else if (value.charAt(index) == ']' && --depth == 0) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int findClosingParenthesis(String value, int open) {
+        int depth = 1;
+        char quote = 0;
+        for (int index = open + 1; index < value.length(); index++) {
+            if (isEscaped(value, index)) {
+                continue;
+            }
+            char character = value.charAt(index);
+            if (quote != 0) {
+                if (character == quote) {
+                    quote = 0;
+                }
+            } else if (character == '\"' || character == '\'') {
+                quote = character;
+            } else if (character == '(') {
+                depth++;
+            } else if (character == ')' && --depth == 0) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static int findUnescaped(String value, char expected, int start) {
+        for (int index = start; index < value.length(); index++) {
+            if (value.charAt(index) == expected && !isEscaped(value, index)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isEscaped(String value, int index) {
+        int slashes = 0;
+        for (int cursor = index - 1; cursor >= 0 && value.charAt(cursor) == '\\'; cursor--) {
+            slashes++;
+        }
+        return slashes % 2 == 1;
+    }
+
+    private static int skipWhitespace(String value, int index) {
+        while (index < value.length() && Character.isWhitespace(value.charAt(index))) {
+            index++;
+        }
+        return index;
+    }
+
+    private static String normalizeReferenceLabel(String label) {
+        return label.strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private static String unescapeMarkdown(String value) {
+        return value.replaceAll("\\\\([!\"#$%&'()*+,./:;<=>?@\\[\\]\\\\^_`{|}~-])", "$1");
+    }
+
+    private static String maskInlineCode(String markdown) {
+        char[] masked = markdown.toCharArray();
+        int index = 0;
+        while (index < markdown.length()) {
+            if (markdown.charAt(index) != '`') {
+                index++;
+                continue;
+            }
+            int run = 1;
+            while (index + run < markdown.length() && markdown.charAt(index + run) == '`') {
+                run++;
+            }
+            String fence = "`".repeat(run);
+            int end = markdown.indexOf(fence, index + run);
+            if (end < 0) {
+                index += run;
+                continue;
+            }
+            for (int cursor = index; cursor < end + run; cursor++) {
+                if (masked[cursor] != '\n' && masked[cursor] != '\r') {
+                    masked[cursor] = ' ';
+                }
+            }
+            index = end + run;
+        }
+        return new String(masked);
+    }
+
+    private record MarkdownDestination(String value, int line) {
+        MarkdownDestination withLine(int newLine) {
+            return new MarkdownDestination(value, newLine);
+        }
+    }
+    private record DestinationParse(String destination, String error) {}
+    private record ReferenceDefinition(
+        String label,
+        MarkdownDestination destination,
+        String error
+    ) {}
 
     private static Result checkDocumentOwnership(Path root) throws IOException {
         Path context = root.resolve("CONTEXT.md");
@@ -271,24 +604,59 @@ public final class GovernanceCheck {
         }
         String content = Files.readString(note);
         String expectedStatus = "Status: " + lifecycle;
-        if (!content.startsWith("# Agent Note: ") || !content.contains("\n\n" + expectedStatus)) {
-            errors.add(relative + " status must match " + lifecycle);
+        String[] openingLines = content.split("\\R", -1);
+        String titlePrefix = "# Agent Note: ";
+        boolean validTitle = openingLines.length > 0
+            && openingLines[0].startsWith(titlePrefix)
+            && openingLines[0].equals(openingLines[0].stripTrailing())
+            && !openingLines[0].substring(titlePrefix.length()).isBlank();
+        if (openingLines.length < 4
+            || !validTitle
+            || !openingLines[1].isEmpty()
+            || !openingLines[2].equals(expectedStatus)
+            || !openingLines[3].isEmpty()) {
+            errors.add(relative + " must open with title, blank line, " + expectedStatus
+                + ", and blank line exactly");
         }
-        for (String heading : List.of("## Problem", "## Alternatives considered")) {
-            if (!content.contains(heading)) {
-                errors.add(relative + " is missing " + heading);
+
+        List<String> requiredHeadings = switch (lifecycle) {
+            case "implemented" -> List.of(
+                "## Problem",
+                "## Decision",
+                "## Alternatives considered",
+                "## Consequences"
+            );
+            case "proposed" -> List.of(
+                "## Problem",
+                "## Proposal",
+                "## Alternatives considered",
+                "## Acceptance criteria",
+                "## Risks"
+            );
+            case "rejected" -> List.of(
+                "## Problem",
+                "## Proposal",
+                "## Alternatives considered"
+            );
+            default -> List.of();
+        };
+        List<String> actualHeadings = outsideFencedBlocks(content).lines()
+            .filter(line -> line.startsWith("## ") && !line.startsWith("### "))
+            .toList();
+        int previous = -1;
+        boolean orderValid = true;
+        for (String heading : requiredHeadings) {
+            int position = actualHeadings.indexOf(heading);
+            if (position < 0) {
+                errors.add(relative + " is missing exact heading " + heading);
+            } else if (position <= previous) {
+                orderValid = false;
             }
+            previous = Math.max(previous, position);
         }
-        String lifecycleHeading = lifecycle.equals("implemented") ? "## Decision" : "## Proposal";
-        if (!content.contains(lifecycleHeading)) {
-            errors.add(relative + " is missing " + lifecycleHeading);
-        }
-        if (lifecycle.equals("implemented") && !content.contains("## Consequences")) {
-            errors.add(relative + " is missing ## Consequences");
-        }
-        if (lifecycle.equals("proposed")
-            && (!content.contains("## Acceptance criteria") || !content.contains("## Risks"))) {
-            errors.add(relative + " must include acceptance criteria and risks");
+        if (!orderValid) {
+            errors.add(relative + " required headings must appear in order: "
+                + String.join(", ", requiredHeadings));
         }
     }
 
@@ -297,7 +665,7 @@ public final class GovernanceCheck {
         if (!Files.exists(source)) {
             return unavailable(
                 surface.name() + "-instructions",
-                "activate when " + surface.activationPath() + " exists"
+                "Phase 0; activate when " + surface.activationPath() + " exists"
             );
         }
         Path instructions = root.resolve(surface.instructionsPath());
@@ -335,7 +703,7 @@ public final class GovernanceCheck {
 
     private record Surface(String name, String activationPath, String instructionsPath) {
         boolean matches(String changedPath) {
-            String normalized = changedPath.replace('\\', '/').toLowerCase(Locale.ROOT);
+            String normalized = changedPath.toLowerCase(Locale.ROOT);
             return normalized.equals(name) || normalized.startsWith(name + "/");
         }
     }

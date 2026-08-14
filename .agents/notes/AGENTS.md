@@ -14,7 +14,7 @@ Use `.agents/notes/<lifecycle>/<class>/YYYY-MM-DD-<topic>.md`.
 
 ## Required format
 
-Every note begins with:
+Every note begins with exactly this four-line structure, including both blank lines:
 
 ```text
 # Agent Note: <title>
@@ -22,11 +22,11 @@ Every note begins with:
 Status: <lifecycle>
 ```
 
-Every note contains `## Problem` and `## Alternatives considered`.
+Required headings are exact level-2 headings outside fenced blocks and appear in this order:
 
-- A proposed note also contains `## Proposal`, `## Acceptance criteria`, and `## Risks`.
-- An implemented note also contains `## Decision` and `## Consequences`, written as present reality.
-- A rejected note retains `## Proposal`; its status and body explain the rejection.
+- Proposed: `## Problem`, `## Proposal`, `## Alternatives considered`, `## Acceptance criteria`, `## Risks`.
+- Implemented: `## Problem`, `## Decision`, `## Alternatives considered`, `## Consequences`; write the decision and consequences as present reality.
+- Rejected: `## Problem`, `## Proposal`, `## Alternatives considered`; the status and body explain the rejection.
 
 Record genuine alternatives only. When an architecture proposal is accepted, move the durable decision into one ADR and remove or reject the proposal so there are not two active rationale owners.
 

@@ -8,7 +8,7 @@ The Workbench has domain and design documents but no stable instruction entry fo
 
 ## Decision
 
-`AGENTS.md` is the authoritative instruction entry, and root `CLAUDE.md` links to it. Root instructions contain repository-wide invariants and route work to scoped instructions and owning documents. Architecture facts, accepted runtime decisions, governance rationale, reusable procedures, and task plans remain in separate owners.
+`AGENTS.md` is the authoritative instruction entry, and root `CLAUDE.md` links to it. Root instructions route work to scoped instructions and link to the invariants owned by `CONTEXT.md`; they do not copy or own those invariants. Architecture facts, accepted runtime decisions, governance rationale, reusable procedures, and task plans remain in separate owners.
 
 `scripts/check.sh` exposes focused and full verification. The governance validator reports absent future implementation surfaces as unavailable. When a source surface appears, its nearest scoped `AGENTS.md` becomes mandatory in the same change.
 

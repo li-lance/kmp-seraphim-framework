@@ -253,7 +253,7 @@ These rules supplement the repository-wide [instructions](../AGENTS.md). Read [W
 - Toolchain values come from the root version catalog; do not duplicate dependency versions.
 - Test policy with Gradle TestKit and focused plugin tests before running affected generated-Product certification.
 
-Run `../scripts/check.sh focused platform-kit` and `../gradlew -p platform-kit test` for platform-kit changes.
+From the repository root, run `./scripts/check.sh focused platform-kit` and `./gradlew -p platform-kit test` for platform-kit changes.
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -518,7 +518,7 @@ These rules supplement the repository-wide [instructions](../AGENTS.md). Read [W
 - Never overwrite a non-empty destination or claim that Render certified a platform build.
 - Reject unsupported combinations explicitly; do not silently drop a requested platform or capability.
 
-Run `../scripts/check.sh focused tooling` and `../gradlew :tooling:generator:test` for tooling changes.
+From the repository root, run `./scripts/check.sh focused tooling` and `./gradlew :tooling:generator:test` for tooling changes.
 ```
 
 - [ ] **Step 3: Run tests to verify they fail**
@@ -860,7 +860,7 @@ These rules supplement the repository-wide [instructions](../AGENTS.md). Templat
 - Do not place Product-specific roadmap phases or unproven shared abstractions into templates.
 - A rendered tree proves structure; only Certify proves supported platform builds.
 
-Run `../scripts/check.sh focused templates`, generator tests, and the certification commands for every claimed template combination.
+From the repository root, run `./scripts/check.sh focused templates`, `./gradlew :tooling:generator:test`, and `./gradlew -p <clean-generated-product> <certification-tasks>` for every claimed template combination.
 ```
 
 - [ ] **Step 1: Add product build files**
@@ -1211,7 +1211,7 @@ These rules supplement the repository-wide [instructions](../AGENTS.md). Every P
 - Product source does not reach into Workbench tooling internals; exported Products consume only their locked platform-kit and generated metadata.
 - Preserve local-first behavior until a Product explicitly selects and implements backend capabilities.
 
-Run `../scripts/check.sh focused products` plus the Product's selected platform tests and certification commands.
+From the repository root, run `./scripts/check.sh focused products` plus `./gradlew -p products/<product> <selected-platform-test-tasks>` and the Product's certification commands.
 ```
 
 - [ ] **Step 4: Run all generator tests and render the reference product**
