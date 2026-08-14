@@ -6,6 +6,7 @@ import java.util.List;
 public final class GovernanceCheckTest {
     public static void main(String[] args) throws Exception {
         acceptsValidBaseline();
+        ignoresRepositoryLocalScratchRoots();
         unavailableSurfacesNamePhaseAndActivation();
         focusedModeNormalizesChangedPaths();
         wrapperRunsFromNestedDirectory();
@@ -79,6 +80,27 @@ public final class GovernanceCheckTest {
             "products-instructions",
             "Phase 0; activate when products exists"
         );
+    }
+
+    private static void ignoresRepositoryLocalScratchRoots() throws Exception {
+        Path root = fixture();
+        write(
+            root,
+            ".worktrees/copy/CONTEXT.md",
+            "# Scratch context\n\n## Domain Language\n\n[broken](missing.md)\n"
+        );
+        write(
+            root,
+            "worktrees/copy/CONTEXT.md",
+            "# Scratch context\n\n## Invariants\n\n[broken](missing.md)\n"
+        );
+        write(
+            root,
+            ".superpowers/sdd/progress.md",
+            "# Scratch progress\n\n## Delivery Sequence\n\n[broken](missing.md)\n"
+        );
+
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
     }
 
     private static void wrapperRunsFromNestedDirectory() throws Exception {

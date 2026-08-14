@@ -1,8 +1,11 @@
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -687,15 +690,32 @@ public final class GovernanceCheck {
     }
 
     private static List<Path> markdownFiles(Path root) throws IOException {
-        try (Stream<Path> stream = Files.walk(root)) {
-            return stream
-                .filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".md"))
-                .filter(path -> !path.startsWith(root.resolve(".git")))
-                .filter(path -> !path.startsWith(root.resolve(".idea")))
-                .sorted()
-                .toList();
-        }
+        Set<Path> excludedRoots = Set.of(
+            root.resolve(".git"),
+            root.resolve(".idea"),
+            root.resolve(".worktrees"),
+            root.resolve("worktrees"),
+            root.resolve(".superpowers")
+        );
+        List<Path> markdown = new ArrayList<>();
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                return excludedRoots.contains(directory)
+                    ? FileVisitResult.SKIP_SUBTREE
+                    : FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                if (attributes.isRegularFile() && file.toString().endsWith(".md")) {
+                    markdown.add(file);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        markdown.sort(Comparator.naturalOrder());
+        return List.copyOf(markdown);
     }
 
     private static Result pass(String name, String detail) {
