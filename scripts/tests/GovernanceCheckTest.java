@@ -14,11 +14,14 @@ public final class GovernanceCheckTest {
         rejectsBrokenReferenceLink();
         acceptsReferenceLinksAndOptionalTitles();
         acceptsBalancedParenthesesInDestinations();
+        preservesLiteralPlusInRelativePaths();
         ignoresLinksInsideCodeFences();
+        preservesLineNumbersAfterCodeFences();
         ignoresLinksInsideInlineCode();
         rejectsBrokenMarkdownAnchor();
         acceptsSetextHeadingAnchors();
         supportsDuplicateHeadingSuffixes();
+        avoidsGeneratedAnchorCollisions();
         rejectsMissingDuplicateHeadingSuffix();
         rejectsMalformedInlineLinkSyntax();
         rejectsDuplicateContextOwnership();
@@ -130,6 +133,19 @@ public final class GovernanceCheckTest {
         );
     }
 
+    private static void preservesLineNumbersAfterCodeFences() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n```markdown\n[example](missing.md)\n```\n\n[broken](missing.md)\n"
+        );
+        assertDetailContains(
+            GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()),
+            "markdown-links",
+            "docs/development.md:7 -> missing.md"
+        );
+    }
+
     private static void acceptsReferenceLinksAndOptionalTitles() throws Exception {
         Path root = fixture();
         Files.writeString(
@@ -158,6 +174,16 @@ public final class GovernanceCheckTest {
         Files.writeString(
             root.resolve("docs/development.md"),
             "# Development\n\nUse `[fixture](missing.md)` as an example.\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+    }
+
+    private static void preservesLiteralPlusInRelativePaths() throws Exception {
+        Path root = fixture();
+        write(root, "docs/c++.md", "# C++\n");
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[C++](c++.md)\n"
         );
         assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
     }
@@ -216,6 +242,19 @@ public final class GovernanceCheckTest {
             "markdown-links",
             GovernanceCheck.State.FAIL
         );
+    }
+
+    private static void avoidsGeneratedAnchorCollisions() throws Exception {
+        Path root = fixture();
+        Files.writeString(
+            root.resolve("docs/architecture.md"),
+            "# Architecture\n\n## Repeat\n\n## Repeat\n\n## Repeat-1\n"
+        );
+        Files.writeString(
+            root.resolve("docs/development.md"),
+            "# Development\n\n[collision-free](architecture.md#repeat-1-1)\n"
+        );
+        assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
     }
 
     private static void rejectsMalformedInlineLinkSyntax() throws Exception {
@@ -423,6 +462,22 @@ public final class GovernanceCheckTest {
             .orElseThrow(() -> new AssertionError("Missing result: " + name));
         if (!result.detail().equals(expected)) {
             throw new AssertionError(name + " expected detail '" + expected + "' but was " + result);
+        }
+    }
+
+    private static void assertDetailContains(
+        List<GovernanceCheck.Result> results,
+        String name,
+        String expectedFragment
+    ) {
+        GovernanceCheck.Result result = results.stream()
+            .filter(candidate -> candidate.name().equals(name))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing result: " + name));
+        if (!result.detail().contains(expectedFragment)) {
+            throw new AssertionError(
+                name + " expected detail containing '" + expectedFragment + "' but was " + result
+            );
         }
     }
 }

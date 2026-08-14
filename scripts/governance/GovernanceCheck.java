@@ -5,7 +5,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -128,7 +127,7 @@ public final class GovernanceCheck {
                 }
                 String[] parts = destination.split("#", 2);
                 String pathPart = parts[0];
-                pathPart = URLDecoder.decode(pathPart, StandardCharsets.UTF_8);
+                pathPart = percentDecode(pathPart);
                 Path target = pathPart.isEmpty()
                     ? markdown
                     : markdown.getParent().resolve(pathPart).normalize();
@@ -136,7 +135,7 @@ public final class GovernanceCheck {
                     errors.add(root.relativize(markdown) + ":" + parsed.line() + " -> " + destination);
                 } else if (parts.length == 2 && !parts[1].isEmpty()
                     && Files.isRegularFile(target) && target.toString().endsWith(".md")
-                    && !hasAnchor(target, URLDecoder.decode(parts[1], StandardCharsets.UTF_8))) {
+                    && !hasAnchor(target, percentDecode(parts[1]))) {
                     errors.add(root.relativize(markdown) + ":" + parsed.line()
                         + " -> missing anchor " + destination);
                 }
@@ -145,6 +144,10 @@ public final class GovernanceCheck {
         return errors.isEmpty()
             ? pass("markdown-links", "all supported relative Markdown links and anchors resolve")
             : fail("markdown-links", String.join("; ", errors));
+    }
+
+    private static String percentDecode(String value) {
+        return URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
     private static boolean hasAnchor(Path markdown, String expected) throws IOException {
@@ -166,13 +169,15 @@ public final class GovernanceCheck {
                 index++;
             }
         }
-        Map<String, Integer> occurrences = new HashMap<>();
         Set<String> anchors = new HashSet<>();
         for (String heading : headings) {
             String base = headingAnchor(heading);
-            int occurrence = occurrences.getOrDefault(base, 0);
-            anchors.add(occurrence == 0 ? base : base + "-" + occurrence);
-            occurrences.put(base, occurrence + 1);
+            String candidate = base;
+            int suffix = 0;
+            while (anchors.contains(candidate)) {
+                candidate = base + "-" + ++suffix;
+            }
+            anchors.add(candidate);
         }
         return anchors;
     }
@@ -519,15 +524,19 @@ public final class GovernanceCheck {
                 fenced = true;
                 fenceCharacter = stripped.charAt(0);
                 fenceLength = leadingCount(stripped, fenceCharacter);
+                result.append('\n');
                 continue;
             }
             if (fenced && !stripped.isEmpty() && stripped.charAt(0) == fenceCharacter
                 && leadingCount(stripped, fenceCharacter) >= fenceLength) {
                 fenced = false;
+                result.append('\n');
                 continue;
             }
             if (!fenced) {
                 result.append(line).append('\n');
+            } else {
+                result.append('\n');
             }
         }
         return result.toString();
