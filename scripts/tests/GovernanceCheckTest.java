@@ -8,6 +8,7 @@ public final class GovernanceCheckTest {
         acceptsValidBaseline();
         ignoresRepositoryLocalScratchRoots();
         scansGovernedMarkdownFileSymlinks();
+        ignoresGovernedPathDirectorySymlinks();
         unavailableSurfacesNamePhaseAndActivation();
         focusedModeNormalizesChangedPaths();
         wrapperRunsFromNestedDirectory();
@@ -136,6 +137,23 @@ public final class GovernanceCheckTest {
             );
         } finally {
             Files.deleteIfExists(externalMarkdown);
+        }
+    }
+
+    private static void ignoresGovernedPathDirectorySymlinks() throws Exception {
+        Path root = fixture();
+        Path externalDirectory = Files.createTempDirectory("governance-linked-directory-");
+        Path externalMarkdown = externalDirectory.resolve("CONTEXT.md");
+        try {
+            Files.writeString(
+                externalMarkdown,
+                "# External context\n\n## Invariants\n\n[broken](missing.md)\n"
+            );
+            Files.createSymbolicLink(root.resolve("docs/external-directory"), externalDirectory);
+            assertNoFailure(GovernanceCheck.run(root, GovernanceCheck.Mode.FULL, List.of()));
+        } finally {
+            Files.deleteIfExists(externalMarkdown);
+            Files.deleteIfExists(externalDirectory);
         }
     }
 
