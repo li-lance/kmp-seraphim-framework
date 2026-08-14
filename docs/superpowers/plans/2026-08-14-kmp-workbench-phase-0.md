@@ -23,6 +23,9 @@
 - Generation never overwrites a non-empty destination.
 - Desktop, Web/Wasm, persistence, Ktor, authentication, synchronization, migration, and standalone CLI export are out of Phase 0 scope.
 - The only checked-in dependency version source is `gradle/libs.versions.toml`; platform-kit reads that catalog.
+- Root and scoped AI governance follows [AI Governance Design](../specs/2026-08-14-ai-governance-design.md).
+- A new `platform-kit/`, `tooling/`, `templates/`, or `products/` source surface includes its scoped `AGENTS.md` in the same task.
+- Every task runs `./scripts/check.sh focused <changed-path>...`; Phase 0 completion runs `./scripts/check.sh full`.
 
 Authoritative references:
 
@@ -183,6 +186,7 @@ git commit -m "build: establish KMP workbench toolchain"
 ### Task 2: Add Target-Neutral Platform Policy
 
 **Files:**
+- Create: `platform-kit/AGENTS.md`
 - Create: `platform-kit/settings.gradle.kts`
 - Create: `platform-kit/build.gradle.kts`
 - Create: `platform-kit/src/main/kotlin/com/seraphim/workbench/build/Toolchain.kt`
@@ -233,6 +237,23 @@ class ConventionPluginsTest {
         assertFalse(project.pluginManager.hasPlugin("com.android.application"))
     }
 }
+```
+
+- [ ] **Step: Add platform-kit instructions**
+
+Create `platform-kit/AGENTS.md`:
+
+```markdown
+# Platform Kit Instructions
+
+These rules supplement the repository-wide [instructions](../AGENTS.md). Read [Workbench architecture](../docs/architecture.md) before changing build policy.
+
+- Platform-kit owns compiler, build, quality, and test policy; it never selects Product platforms or Module topology.
+- Convention plugins configure an already selected official Kotlin or Android plugin and must not apply platform plugins implicitly.
+- Toolchain values come from the root version catalog; do not duplicate dependency versions.
+- Test policy with Gradle TestKit and focused plugin tests before running affected generated-Product certification.
+
+Run `../scripts/check.sh focused platform-kit` and `../gradlew -p platform-kit test` for platform-kit changes.
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -386,6 +407,7 @@ git commit -m "build: add target-neutral platform policy"
 ### Task 3: Implement Manifest Parsing and Validation
 
 **Files:**
+- Create: `tooling/AGENTS.md`
 - Create: `tooling/generator/build.gradle.kts`
 - Create: `tooling/generator/src/main/kotlin/com/seraphim/workbench/manifest/ProjectManifest.kt`
 - Create: `tooling/generator/src/main/kotlin/com/seraphim/workbench/manifest/ManifestReader.kt`
@@ -479,6 +501,24 @@ class ManifestTest {
         """.trimIndent()
     }
 }
+```
+
+- [ ] **Step: Add tooling instructions**
+
+Create `tooling/AGENTS.md`:
+
+```markdown
+# Tooling Instructions
+
+These rules supplement the repository-wide [instructions](../AGENTS.md). Read [Workbench architecture](../docs/architecture.md) before changing the Manifest or generator.
+
+- Validate the complete Manifest before writing Product files.
+- Keep parsing, validation, resolution, rendering, structural verification, and publication as independently testable responsibilities.
+- Render into a sibling temporary directory and publish atomically only after structural verification.
+- Never overwrite a non-empty destination or claim that Render certified a platform build.
+- Reject unsupported combinations explicitly; do not silently drop a requested platform or capability.
+
+Run `../scripts/check.sh focused tooling` and `../gradlew :tooling:generator:test` for tooling changes.
 ```
 
 - [ ] **Step 3: Run tests to verify they fail**
@@ -782,6 +822,7 @@ Expected: renderer tests pass; no test claims to compile a platform during rende
 ### Task 5: Add the Daily-Board Android+iOS Template
 
 **Files:**
+- Create: `templates/AGENTS.md`
 - Create: `templates/daily-board-base/settings.gradle.kts`
 - Create: `templates/daily-board-base/build.gradle.kts`
 - Create: `templates/daily-board-base/gradle.properties`
@@ -803,6 +844,24 @@ Expected: renderer tests pass; no test claims to compile a platform during rende
 - Produces: framework `TaskBoardShared` for `iosArm64` and `iosSimulatorArm64`.
 - Produces: separate Compose and SwiftUI source trees.
 - Consumes: the two platform-kit plugin IDs and renderer tokens.
+
+- [ ] **Step: Add template instructions**
+
+Create `templates/AGENTS.md`:
+
+```markdown
+# Template Instructions
+
+These rules supplement the repository-wide [instructions](../AGENTS.md). Templates are promoted only after a maintained Product proves the structure and a clean generated copy is certified.
+
+- Keep template output deterministic for the same Manifest, template catalog, and toolchain lock.
+- Use explicit replacement tokens and verify that no unresolved token reaches published output.
+- Emit only selected platforms and capabilities.
+- Do not place Product-specific roadmap phases or unproven shared abstractions into templates.
+- A rendered tree proves structure; only Certify proves supported platform builds.
+
+Run `../scripts/check.sh focused templates`, generator tests, and the certification commands for every claimed template combination.
+```
 
 - [ ] **Step 1: Add product build files**
 
@@ -1059,6 +1118,7 @@ Expected: the template contains unresolved tokens only under `templates/daily-bo
 ### Task 6: Wire the Gradle Render Entry Point
 
 **Files:**
+- Create: `products/AGENTS.md`
 - Create: `tooling/generator/src/main/kotlin/com/seraphim/workbench/generator/Main.kt`
 - Modify: `build.gradle.kts`
 - Create: `project.yaml`
@@ -1136,6 +1196,24 @@ data:
   strategy: local-only
 ```
 
+- [ ] **Step: Add Product instructions**
+
+Create `products/AGENTS.md`:
+
+```markdown
+# Product Instructions
+
+These rules supplement the repository-wide [instructions](../AGENTS.md). Every Product is independently buildable and may add a Product-local `AGENTS.md` when it gains rules not shared by sibling Products.
+
+- Platform applications own UI, navigation, lifecycle, accessibility, theme, permissions, and presentation state.
+- Shared Kotlin owns business rules and narrow platform-facing commands, snapshots, failures, and event streams; it never owns platform UI.
+- Unselected platforms do not appear in the Product settings or Gradle Module graph.
+- Product source does not reach into Workbench tooling internals; exported Products consume only their locked platform-kit and generated metadata.
+- Preserve local-first behavior until a Product explicitly selects and implements backend capabilities.
+
+Run `../scripts/check.sh focused products` plus the Product's selected platform tests and certification commands.
+```
+
 - [ ] **Step 4: Run all generator tests and render the reference product**
 
 ```bash
@@ -1160,6 +1238,7 @@ git commit -m "feat: render the daily-board reference product"
 - Create: `scripts/certify-generated-product.sh`
 - Create: `.github/workflows/certify-phase-0.yml`
 - Modify: `README.md`
+- Modify: `docs/architecture.md`
 
 **Interfaces:**
 - Produces: local structural and Android certification command.
@@ -1201,6 +1280,38 @@ scripts/certify-generated-product.sh
 ```
 
 Expected: a fresh fixture is rendered, shared tests pass, Android host tests pass, and the debug APK assembles.
+
+- [ ] **Step: Publish the implemented Phase 0 architecture**
+
+In `docs/architecture.md`, replace `## Current state` and `## Target composition` with:
+
+````markdown
+## Current state
+
+Phase 0 implements the root orchestration build, target-neutral platform-kit, Manifest validation, structural Render transaction, Android+iOS daily-board template, maintained reference Product, and clean certification entry point. Desktop, Web/Wasm, persistence, backend, authentication, synchronization, migration, and standalone CLI export remain outside the implemented baseline.
+
+## Phase 0 composition
+
+```text
+project.yaml
+    ↓
+tooling/generator → products/daily-board
+        ↑                    ↓
+templates/           Android and iOS certification
+        ↑
+platform-kit supplies build policy without selecting Product topology
+```
+
+- The Workbench root orchestrates generation and certification.
+- `tooling/generator` validates the Manifest, resolves the template, renders into a sibling temporary directory, verifies structure, and publishes atomically.
+- `platform-kit/` supplies compiler, build, quality, and test policy through an included build.
+- `templates/daily-board-base/` owns the certified Android+iOS template.
+- `products/daily-board/` is the independently buildable reference Product.
+
+The approved detailed design is [KMP Multi-Project Workbench Design](superpowers/specs/2026-08-14-kmp-multi-project-workbench-design.md). [CONTEXT.md](../CONTEXT.md) owns domain definitions and invariants.
+````
+
+Include `docs/architecture.md` in Task 7's commit so shipped composition and certification evidence cannot diverge.
 
 - [ ] **Step 3: Add CI certification**
 
@@ -1290,11 +1401,19 @@ Expected:
 - `.idea/` remains untracked and unstaged.
 
 ```bash
-git add .github/workflows/certify-phase-0.yml scripts/certify-generated-product.sh README.md
+git add .github/workflows/certify-phase-0.yml scripts/certify-generated-product.sh README.md docs/architecture.md
 git commit -m "ci: certify generated Android and iOS products"
 ```
 
 ## Phase 0 Completion Gate
+
+Run:
+
+```bash
+./scripts/check.sh full
+```
+
+Expected: every governance check reports `PASS`; no scoped instruction remains `UNAVAILABLE` after all four source surfaces exist.
 
 Phase 0 is complete only when:
 
