@@ -17,6 +17,7 @@
 - 本机执行 Gradle 前需 `export ANDROID_HOME=/Users/lanceli/Library/Android/sdk`（会话环境未设置该变量）。
 - `Instant.now()` 在锁定 Kotlin 2.4.10 下是 deprecation ERROR：一律用 `kotlin.time.Clock.System.now()` 替代（Task 5/7 的实现与测试代码同样适用）。
 - Task 5 的 updateTask 实现中，notes 的语义修正为：参数非 null 时以校验结果为准（"" 归一化为 null = 清空），null 表示不变——实现写 `if (notes != null) validateNotes(notes) else current.notes`（计划原文的 `?.let ?: current.notes` 在清空场景吞掉 null，已被实现修正）。
+- Task 8 的 RankPropertyTest 断言修正：`(rank,id)` 全序 ≠ id 升序（moveTask 重排会破坏 id 升序）；断言应为列内列表等于按 `(rank,id)` 排序的结果，同时生成器对同列移动的 toIndex 上界取 `size-1`（跨列取 `size`）。restoreTask 保持「回 START 列末尾（rank=活动任务数）」的 spec 语义不变。
 
 ## Global Constraints
 
@@ -1446,7 +1447,9 @@ class RankPropertyTest {
                 1 -> if (activeTasks.isNotEmpty()) {
                     val task = activeTasks.random(random)
                     val target = snapshot.columns.random(random).id
-                    store.moveTask(task.id, target, random.nextInt(0, snapshot.tasks[target].orEmpty().size + 1))
+                    val targetSize = snapshot.tasks[target].orEmpty().size
+                    val upperBound = if (task.columnId == target) targetSize else targetSize + 1
+                    store.moveTask(task.id, target, random.nextInt(0, upperBound))
                 }
                 2 -> store.createColumn("c" + counter++)
                 3 -> if (middle.isNotEmpty()) store.deleteColumn(middle.random(random).id)
@@ -1479,8 +1482,8 @@ class RankPropertyTest {
                 assertNull(item.archivedAt, "active task in column " + column.id.value)
                 assertEquals(column.id, item.columnId)
             }
-            val ids = items.map { it.id.value }
-            assertEquals(ids.sorted(), ids, "stable total order in column " + column.id.value)
+            val ordered = items.sortedWith(compareBy({ it.rank }, { it.id.value }))
+            assertEquals(ordered, items, "(rank,id) total order in column " + column.id.value)
         }
         snapshot.archivedTasks.forEach { task ->
             assertNull(snapshot.tasks.values.flatten().find { it.id == task.id })
