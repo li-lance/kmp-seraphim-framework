@@ -91,9 +91,10 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         val archived = tasks.filter { it.columnId == id }.map { it.copy(archivedAt = now, rank = 0) }
         val newColumns = renumberColumns(columns.filterNot { it.id == id })
         val newTasks = tasks.filterNot { it.columnId == id } + archived
+        // 归档 UpsertTask 先于 DeleteColumn：SQLite 即时 FK 约束要求引用行先置 NULL
         repository.apply(
-            listOf(BoardDelta.DeleteColumn(id)) +
-                archived.map { BoardDelta.UpsertTask(it) } +
+            archived.map { BoardDelta.UpsertTask(it) } +
+                listOf(BoardDelta.DeleteColumn(id)) +
                 columnDeltas(columns, newColumns),
         )
         columns = newColumns.toMutableList()

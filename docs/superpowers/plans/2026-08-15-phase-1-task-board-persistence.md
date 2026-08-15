@@ -18,6 +18,7 @@
 - `Instant.now()` 在锁定 Kotlin 2.4.10 下是 deprecation ERROR：一律用 `kotlin.time.Clock.System.now()` 替代（Task 5/7 的实现与测试代码同样适用）。
 - Task 5 的 updateTask 实现中，notes 的语义修正为：参数非 null 时以校验结果为准（"" 归一化为 null = 清空），null 表示不变——实现写 `if (notes != null) validateNotes(notes) else current.notes`（计划原文的 `?.let ?: current.notes` 在清空场景吞掉 null，已被实现修正）。
 - Task 8 的 RankPropertyTest 断言修正：`(rank,id)` 全序 ≠ id 升序（moveTask 重排会破坏 id 升序）；断言应为列内列表等于按 `(rank,id)` 排序的结果，同时生成器对同列移动的 toIndex 上界取 `size-1`（跨列取 `size`）。restoreTask 保持「回 START 列末尾（rank=活动任务数）」的 spec 语义不变。
+- Task 9 评审发现的 delta 顺序缺陷：deleteColumn 的批次须把归档 UpsertTask 放在 DeleteColumn 之前（SQLite 即时 FK 约束要求引用行先置 NULL），已修正实现与计划；Task 10 的 PersistenceSmokeTest 增加删除含任务列的步骤锁定该行为。
 
 - Task 9 的 settings.gradle.kts 变更**不加入** `__WEB_MODULES__` token：渲染器在 Task 12 才求值该 token，而 GeneratedTreeVerifier 拒绝渲染树残留 `__`，Task 9 加入会使 createProduct 失败并阻断尖刺。Task 12 实现条件发射时须同时把 `__WEB_MODULES__` 行加入模板 settings.gradle.kts（web 未选时渲染为空行）。
 - Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。
@@ -840,9 +841,10 @@ Expected: 编译失败——deleteColumn 未定义（createTask 也缺失，Task
         val archived = tasks.filter { it.columnId == id }.map { it.copy(archivedAt = now, rank = 0) }
         val newColumns = renumberColumns(columns.filterNot { it.id == id })
         val newTasks = tasks.filterNot { it.columnId == id } + archived
+        // 归档 UpsertTask 先于 DeleteColumn：SQLite 即时 FK 约束要求引用行先置 NULL
         repository.apply(
-            listOf(BoardDelta.DeleteColumn(id)) +
-                archived.map { BoardDelta.UpsertTask(it) } +
+            archived.map { BoardDelta.UpsertTask(it) } +
+                listOf(BoardDelta.DeleteColumn(id)) +
                 columnDeltas(columns, newColumns),
         )
         columns = newColumns.toMutableList()
@@ -2115,6 +2117,9 @@ class PersistenceSmokeTest {
         store1.open()
         val doing = store1.createColumn("Doing").columns[1].id
         store1.createTask(doing, "persisted", notes = "n")
+        val doomed = store1.createColumn("Doomed").columns[2].id
+        store1.createTask(doomed, "cascade-archived")
+        store1.deleteColumn(doomed)   // FK 下删除含任务列：归档 upsert 先于列删除
         val endId = store1.snapshot().columns.last().id
         val doneId = store1.createTask(endId, "done").tasks.getValue(endId).single().id
         store1.archiveTask(doneId)
@@ -2124,7 +2129,7 @@ class PersistenceSmokeTest {
         val snapshot = store2.snapshot()
         assertEquals(listOf("开始", "Doing", "结束"), snapshot.columns.map { it.name })
         assertEquals(listOf("persisted"), snapshot.tasks.getValue(doing).map { it.title })
-        assertEquals(listOf("done"), snapshot.archivedTasks.map { it.title })
+        assertEquals(setOf("done", "cascade-archived"), snapshot.archivedTasks.map { it.title }.toSet())
         context.deleteDatabase("smoke.db")
     }
 }
