@@ -20,6 +20,14 @@ kotlin {
         minSdk = 26
         withHostTest {}
     }
+    // 合约测试基类 RepositoryContractTest 在 androidHostTest 下由
+    // @RunWith(RobolectricTestRunner) 的 AndroidRepositoryContractTest 子类运行；
+    // 排除基类本身，避免 JUnit4 在无 Robolectric 环境下双跑同一套 @Test 方法。
+    tasks.configureEach {
+        if (name == "testAndroidHostTest" && this is Test) {
+            filter { excludeTestsMatching("com.seraphim.dailyboard.localdata.RepositoryContractTest") }
+        }
+    }
     iosArm64 {
         binaries.framework {
             baseName = "LocalDataSql"

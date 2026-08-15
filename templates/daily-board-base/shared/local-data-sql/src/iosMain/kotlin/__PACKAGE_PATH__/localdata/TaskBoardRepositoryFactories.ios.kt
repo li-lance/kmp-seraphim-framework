@@ -9,7 +9,7 @@ fun taskBoardRepository(name: String = "daily-board.db"): TaskBoardRepository {
         NativeSqliteDriver(
             schema = TaskBoardDatabase.Schema,
             name = name,
-            onConfiguration = { foreign_keys(true) },
+            onConfiguration = { it.copy(extendedConfig = it.extendedConfig.copy(foreignKeyConstraints = true)) },
         )
     } catch (failure: IllegalStateException) {
         throw StorageError("Cannot open the daily-board database", failure)

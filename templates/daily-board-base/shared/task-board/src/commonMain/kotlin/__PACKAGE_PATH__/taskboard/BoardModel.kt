@@ -1,5 +1,6 @@
 package __PACKAGE_NAME__.taskboard
 
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 
 @JvmInline

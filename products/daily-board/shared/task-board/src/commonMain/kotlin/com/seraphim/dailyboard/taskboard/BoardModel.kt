@@ -1,5 +1,6 @@
 package com.seraphim.dailyboard.taskboard
 
+import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 
 @JvmInline
