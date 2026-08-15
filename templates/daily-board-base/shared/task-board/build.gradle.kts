@@ -23,6 +23,7 @@ kotlin {
             isStatic = true
         }
     }
+    __WASM_JS_TARGET__
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
