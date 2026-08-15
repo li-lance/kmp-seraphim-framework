@@ -19,6 +19,12 @@
 - Task 5 的 updateTask 实现中，notes 的语义修正为：参数非 null 时以校验结果为准（"" 归一化为 null = 清空），null 表示不变——实现写 `if (notes != null) validateNotes(notes) else current.notes`（计划原文的 `?.let ?: current.notes` 在清空场景吞掉 null，已被实现修正）。
 - Task 8 的 RankPropertyTest 断言修正：`(rank,id)` 全序 ≠ id 升序（moveTask 重排会破坏 id 升序）；断言应为列内列表等于按 `(rank,id)` 排序的结果，同时生成器对同列移动的 toIndex 上界取 `size-1`（跨列取 `size`）。restoreTask 保持「回 START 列末尾（rank=活动任务数）」的 spec 语义不变。
 
+- Task 9 的 settings.gradle.kts 变更**不加入** `__WEB_MODULES__` token：渲染器在 Task 12 才求值该 token，而 GeneratedTreeVerifier 拒绝渲染树残留 `__`，Task 9 加入会使 createProduct 失败并阻断尖刺。Task 12 实现条件发射时须同时把 `__WEB_MODULES__` 行加入模板 settings.gradle.kts（web 未选时渲染为空行）。
+- Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。
+- Android 驱动回调签名：SQLDelight 2.2.1 的 `AndroidSqliteDriver.Callback.onConfigure` 参数为 `androidx.sqlite.db.SupportSQLiteDatabase`（非 `android.database.sqlite.SQLiteDatabase`）。
+- Robolectric 冒烟测试第二条用例须写 `kotlinx.coroutines.runBlocking<Unit>`：JUnit 4 校验测试方法必须返回 void，`runBlocking {}` 的尾表达式（deleteDatabase 返回 Boolean）会触发 InvalidTestClassError。
+- 发现（非本任务引入，Task 1 遗留）：task-board commonMain 的 `@JvmInline` 与 `java.lang.Math.floorDiv` 在非 JVM target 无法编译（native/wasm 编译报 Unresolved reference）；Task 1-8 只跑过 androidHostTest 故未暴露，Task 15/17 前需修复。
+
 ## Global Constraints
 
 - 工具链锁定：Kotlin 2.4.10 / AGP 9.1.0 / Gradle 9.3.1 / JDK 17 / compileSdk 37 / targetSdk 37 / minSdk 26 / Xcode 26.4.x。任何升级须整个元组互证。
