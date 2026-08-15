@@ -15,6 +15,7 @@
 - 计划命令中的 `:shared:<module>:androidHostTest` 任务名在 AGP 9.1 KMP 工具链下实际为 `testAndroidHostTest`（源集名仍为 `androidHostTest`）；所有任务按 `testAndroidHostTest` 执行。
 - `BoardError.NotOpen` 是普通 class（Kotlin 不允许零参 data class），名称/消息/层级不变。
 - 本机执行 Gradle 前需 `export ANDROID_HOME=/Users/lanceli/Library/Android/sdk`（会话环境未设置该变量）。
+- `Instant.now()` 在锁定 Kotlin 2.4.10 下是 deprecation ERROR：一律用 `kotlin.time.Clock.System.now()` 替代（Task 5/7 的实现与测试代码同样适用）。
 
 ## Global Constraints
 
