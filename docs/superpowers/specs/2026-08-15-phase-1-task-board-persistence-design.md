@@ -132,7 +132,7 @@ data class TaskItem(
 | `deleteColumn(id)` | 仅 MIDDLE；**列内任务全部归档**（见 5.4） |
 | `moveColumn(id, toIndex)` | 仅 MIDDLE；`toIndex ∈ 1..last-1` |
 | `createTask(columnId, title, notes?, dueDate?)` | 入列末尾 |
-| `updateTask(id, title?, notes?, dueDate?)` | 部分更新；归档任务不可更新 |
+| `updateTask(id, title?, notes?, dueDate?, clearDueDate=false)` | 部分更新；null = 不变，notes 传 "" = 清空，`clearDueDate=true` = 清空截止日期；归档任务不可更新 |
 | `moveTask(id, toColumnId, toIndex)` | 移入 END 列 = 完成；移出 END = 重新打开；同列同位置 = no-op |
 | `archiveTask(id)` | 仅限当前在 END 列的任务 |
 | `restoreTask(id)` | 回 START 列末尾 |
@@ -184,7 +184,7 @@ CREATE TABLE board_column (
 );
 CREATE TABLE task (
     id INTEGER NOT NULL PRIMARY KEY,
-    column_id INTEGER,              -- NULL = 已归档
+    column_id INTEGER REFERENCES board_column(id),   -- NULL = 已归档
     title TEXT NOT NULL,
     notes TEXT,
     due_date INTEGER,               -- epoch-day
@@ -232,8 +232,8 @@ SQL 三端共用一个 `SqlDelightTaskBoardRepository(schema, driver)` 实现（
 
 ### 7.1 共享侧
 
-- Store 持 `MutableStateFlow<BoardSnapshot>`；`snapshot()` 返回当前值，`observe(): StateFlow<BoardSnapshot>` 暴露给 Kotlin 侧 adapter。
-- `StateFlow` 天然去重 + 新订阅者立即收到当前值；`open()` 成功后才发出首个快照，初始化失败 = 流上抛错。
+- Store 持 `MutableStateFlow<BoardSnapshot?>`；`snapshot()` 返回当前值，`observe(): StateFlow<BoardSnapshot?>` 暴露给 Kotlin 侧 adapter（`StateFlow` 无法携带异常，初始化失败经 `open()` 的 `StorageError` 传播，入口按 §8.4 进入错误态 UI）。
+- `StateFlow` 天然去重 + 新订阅者立即收到当前值；`open()` 成功前值为 null，成功后才发出首个快照。
 - 不暴露任何 Lifecycle / Disposable / 回调注册表（平台概念，父设计 §11）。
 
 ### 7.2 各平台契约（本 spec 定义；实现归属见 [## 2](#2-phase-1-拆解与子系统边界)）
@@ -265,6 +265,8 @@ SQL 三端共用一个 `SqlDelightTaskBoardRepository(schema, driver)` 实现（
 sealed class BoardError : RuntimeException() {
     data class InvalidTitle(val title: String) : BoardError()
     data class InvalidColumnName(val name: String) : BoardError()
+    data class InvalidNotes(val notes: String) : BoardError()
+    data class NotUpdatable(val id: TaskId) : BoardError()         // 归档任务不可更新/移动
     data class ColumnNotFound(val id: ColumnId) : BoardError()
     data class TaskNotFound(val id: TaskId) : BoardError()
     data class NotArchivable(val id: TaskId) : BoardError()      // 不在 END 列
