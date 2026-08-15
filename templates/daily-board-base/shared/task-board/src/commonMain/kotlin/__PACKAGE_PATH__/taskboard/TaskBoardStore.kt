@@ -175,6 +175,39 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         publish()
     }
 
+    suspend fun archiveTask(id: TaskId): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) throw BoardError.TaskNotFound(id)
+        val task = tasks[index]
+        if (task.archivedAt != null) throw BoardError.NotRestorable(id)
+        val endColumnId = columns.last().id
+        if (task.columnId != endColumnId) throw BoardError.NotArchivable(id)
+        val archived = task.copy(archivedAt = Clock.System.now(), rank = 0)
+        val renumbered = columnTasks(endColumnId).filterNot { it.id == id }
+            .mapIndexed { position, item -> item.copy(rank = position) }
+        val newTasks = tasks.toMutableList()
+        newTasks.removeAll { it.archivedAt == null && it.columnId == endColumnId }
+        newTasks.addAll(renumbered + archived)
+        repository.apply(listOf(BoardDelta.UpsertTask(archived)) + renumbered.map { BoardDelta.UpsertTask(it) })
+        tasks = newTasks
+        publish()
+    }
+
+    suspend fun restoreTask(id: TaskId): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) throw BoardError.TaskNotFound(id)
+        val task = tasks[index]
+        if (task.archivedAt == null) throw BoardError.NotRestorable(id)
+        val startColumnId = columns.first().id
+        val rank = tasks.count { it.archivedAt == null && it.columnId == startColumnId }
+        val restored = task.copy(columnId = startColumnId, rank = rank, archivedAt = null)
+        repository.apply(listOf(BoardDelta.UpsertTask(restored)))
+        tasks[index] = restored
+        publish()
+    }
+
     private fun columnTasks(columnId: ColumnId): List<TaskItem> =
         tasks.filter { it.archivedAt == null && it.columnId == columnId }
             .sortedWith(compareBy({ it.rank }, { it.id.value }))
