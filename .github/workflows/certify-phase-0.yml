@@ -19,7 +19,7 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v6
       - run: ./gradlew -p platform-kit test
       - run: ./gradlew :tooling:generator:test
@@ -46,4 +46,5 @@ jobs:
           -sdk iphonesimulator
           -destination 'generic/platform=iOS Simulator'
           CODE_SIGNING_ALLOWED=NO
+          ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
           build
