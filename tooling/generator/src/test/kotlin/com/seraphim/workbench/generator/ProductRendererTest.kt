@@ -91,6 +91,12 @@ class ProductRendererTest {
         assertFalse(output.resolve("shared/task-board/build.gradle.kts").readText().contains("wasmJs"))
         assertTrue(output.resolve("shared/local-data-sql/build.gradle.kts").isRegularFile())
         assertFalse(output.resolve("shared/task-board/build.gradle.kts").readText().contains("__"))
+        // 空展开的 token 行应整行移除：settings 恰好一个结尾换行、无残留空行
+        assertEquals(
+            "include(\":shared:task-board\")",
+            output.resolve("settings.gradle.kts").readText(),
+        )
+        assertEquals("kotlin {\n}", output.resolve("shared/task-board/build.gradle.kts").readText())
     }
 
     private fun webManifest() = ProjectManifest(

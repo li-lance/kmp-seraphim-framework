@@ -38,9 +38,15 @@ object ProductRenderer {
                         source.isDirectory() -> target.createDirectories()
                         source.isRegularFile() -> {
                             target.parent.createDirectories()
-                            val rendered = tokens.entries.fold(source.readText()) { value, token ->
-                                value.replace(token.key, token.value)
+                            val renderedLines = source.readText().split("\n").filterNot { line ->
+                                tokens.keys.any { line.contains(it) } &&
+                                    tokens.entries.fold(line) { value, token ->
+                                        value.replace(token.key, token.value)
+                                    }.isBlank()
                             }
+                            val rendered = tokens.entries.fold(
+                                renderedLines.joinToString("\n"),
+                            ) { value, token -> value.replace(token.key, token.value) }
                             target.writeText(rendered)
                         }
                     }
