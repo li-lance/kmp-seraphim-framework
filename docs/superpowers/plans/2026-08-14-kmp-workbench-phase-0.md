@@ -1,5 +1,7 @@
 # KMP Workbench Phase 0 Implementation Plan
 
+> **Erratum:** This plan was executed with three recorded deviations. Their authoritative records are: the root `createProduct` classpath uses a `generatorRuntime` configuration instead of `SourceSetContainer` (configuration-cache safety; Gradle 9 rejects resolving another project's runtime classpath at configuration time); `named("androidHostTest") { dependencies { ... } }` replaces the `androidHostTest.dependencies` static accessor (`withHostTest {}` registers the source set after Kotlin DSL accessors are generated); and Kotlin/Android plugins are hoisted to root `plugins` blocks with `apply false` (KGP cross-classloader conflicts) — see [Root plugin classloader hoisting ADR](../../adr/2026-08-15-root-plugin-classloader-hoisting.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a clean manifest-driven workbench that renders and certifies one Android+iOS local-only daily-board vertical slice without sharing UI code.
