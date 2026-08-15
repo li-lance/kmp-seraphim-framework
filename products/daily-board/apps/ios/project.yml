@@ -14,3 +14,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.seraphim.dailyboard.ios
         CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES

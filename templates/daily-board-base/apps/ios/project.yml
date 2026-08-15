@@ -14,3 +14,4 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: __PACKAGE_NAME__.ios
         CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES
