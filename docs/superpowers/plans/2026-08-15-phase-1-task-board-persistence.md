@@ -24,6 +24,8 @@
 - Task 10 MigrationTest 版本断言修正：SQLDelight 2.2.1 生成的 `TaskBoardDatabase.Schema.version` 为 2（.sq 当前 schema 计 1、1.sqm 迁移 +1），且 AndroidSqliteDriver 惰性建库（须 open() 才写 user_version）——断言 Schema.version 并在 runTest 中调用 open()。
 - Task 10 iOS 编译暴露两处 Task 9 遗留（androidHostTest 未覆盖）：① BoardModel.kt 的 `@JvmInline` 补 `import kotlin.jvm.JvmInline`；② iOS 工厂 `onConfiguration` 用 SQLDelight 2.2.1 新签名 `{ it.copy(extendedConfig = it.extendedConfig.copy(foreignKeyConstraints = true)) }`（旧 `foreign_keys(true)` 不存在）。
 - Task 12 渲染器空 token 行处理：`__WEB_MODULES__`/`__WASM_JS_TARGET__` 展开为空时整行移除（按行过滤含 token 且展开后空白的行，其余行原样保留），避免生成文件结尾出现空行（违反「恰好一个换行符结尾」并触发 diff --check）；对应 ProductRendererTest 增加无空行残留断言。
+- Task 13 的 wasm 编译器强制修正（Kotlin 2.4.10 锁定工具链）：① local-data-web 的 JS interop 源码放 `src/wasmJsMain/`（`kotlin.JsFun`/`JsArray` 属 js/wasm 共享 stdlib，common 不可见）；② `import kotlin.JsFun`（2.4.10 根包，非 kotlin.js）；③ wasm interop 拒绝 `Array<T>`——事务参数用 `JsArray<JsAny>` + `@JsFun("(...names) => names")` vararg 助手；④ commonMain 补 `kotlinx-coroutines-core`（task-board 的 implementation 依赖不传递）；⑤ 行遍历用 `toJsArray(rows).toList().map`；⑥ 两文件加 `@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)`。
+- Task 13 顺带完成 Task 15 Step 1：`__WASM_JS_TARGET__` token 行已加入 task-board 模板 build.gradle.kts（web 夹具解析 wasm 变体需要）——Task 14/15 执行时改为「验证该行存在」而非插入。
 
 - Task 9 的 settings.gradle.kts 变更**不加入** `__WEB_MODULES__` token：渲染器在 Task 12 才求值该 token，而 GeneratedTreeVerifier 拒绝渲染树残留 `__`，Task 9 加入会使 createProduct 失败并阻断尖刺。Task 12 实现条件发射时须同时把 `__WEB_MODULES__` 行加入模板 settings.gradle.kts（web 未选时渲染为空行）。
 - Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。
