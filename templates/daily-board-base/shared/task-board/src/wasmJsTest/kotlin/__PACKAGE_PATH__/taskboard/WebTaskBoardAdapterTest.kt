@@ -68,6 +68,24 @@ class WebTaskBoardAdapterTest {
     }
 
     @Test
+    fun `JSON escapes backspace and control characters in titles`() = runTest {
+        val store = TaskBoardStore(InMemoryRepository())
+        store.open()
+        val bridge = SnapshotBridge(store)
+        val received = mutableListOf<String>()
+        val job = bridge.subscribe({ received += it }, backgroundScope)
+
+        store.createTask(store.snapshot().columns.first().id, "bell\u0008\u0001x")
+
+        testScheduler.runCurrent()
+        val latest = received.last()
+        assertTrue(latest.contains(q + "title" + q + ":" + q + "bell\\b\\u0001x" + q), latest)
+        assertTrue(!latest.contains('\u0008'), "raw backspace leaked into JSON")
+        assertTrue(!latest.contains('\u0001'), "raw U+0001 leaked into JSON")
+        job.cancel()
+    }
+
+    @Test
     fun `disposed subscriptions stop receiving snapshots`() = runTest {
         val store = TaskBoardStore(InMemoryRepository())
         store.open()

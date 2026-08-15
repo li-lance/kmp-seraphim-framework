@@ -10,7 +10,14 @@ private fun String.jsonEscaped(): String = buildString {
             '\n' -> append('\\').append('n')
             '\r' -> append('\\').append('r')
             '\t' -> append('\\').append('t')
-            else -> append(character)
+            '\b' -> append('\\').append('b')
+            '\u000C' -> append('\\').append('f')
+            else -> if (character.code < 0x20) {
+                append('\\').append('u')
+                append(character.code.toString(16).padStart(4, '0'))
+            } else {
+                append(character)
+            }
         }
     }
 }

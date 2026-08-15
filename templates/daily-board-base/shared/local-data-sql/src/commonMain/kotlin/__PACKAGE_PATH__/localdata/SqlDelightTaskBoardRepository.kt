@@ -7,6 +7,7 @@ import __PACKAGE_NAME__.taskboard.Column
 import __PACKAGE_NAME__.taskboard.ColumnId
 import __PACKAGE_NAME__.taskboard.EpochDay
 import __PACKAGE_NAME__.taskboard.PersistedBoard
+import __PACKAGE_NAME__.taskboard.StorageError
 import __PACKAGE_NAME__.taskboard.TaskBoardRepository
 import __PACKAGE_NAME__.taskboard.TaskId
 import __PACKAGE_NAME__.taskboard.TaskItem
@@ -43,28 +44,32 @@ class SqlDelightTaskBoardRepository(driver: SqlDriver) : TaskBoardRepository {
     }
 
     override suspend fun apply(deltas: List<BoardDelta>) {
-        queries.transaction {
-            deltas.forEach { delta ->
-                when (delta) {
-                    is BoardDelta.UpsertColumn -> queries.upsertColumn(
-                        id = delta.column.id.value,
-                        name = delta.column.name,
-                        rank = delta.column.rank.toLong(),
-                    )
-                    is BoardDelta.DeleteColumn -> queries.deleteColumnRow(delta.id.value)
-                    is BoardDelta.UpsertTask -> queries.upsertTask(
-                        id = delta.task.id.value,
-                        column_id = delta.task.columnId.value.takeUnless { delta.task.archivedAt != null },
-                        title = delta.task.title,
-                        notes = delta.task.notes,
-                        due_date = delta.task.dueDate?.value,
-                        rank = delta.task.rank.toLong(),
-                        created_at = delta.task.createdAt.toEpochMilliseconds(),
-                        archived_at = delta.task.archivedAt?.toEpochMilliseconds(),
-                    )
-                    is BoardDelta.DeleteTask -> queries.deleteTaskRow(delta.id.value)
+        try {
+            queries.transaction {
+                deltas.forEach { delta ->
+                    when (delta) {
+                        is BoardDelta.UpsertColumn -> queries.upsertColumn(
+                            id = delta.column.id.value,
+                            name = delta.column.name,
+                            rank = delta.column.rank.toLong(),
+                        )
+                        is BoardDelta.DeleteColumn -> queries.deleteColumnRow(delta.id.value)
+                        is BoardDelta.UpsertTask -> queries.upsertTask(
+                            id = delta.task.id.value,
+                            column_id = delta.task.columnId.value.takeUnless { delta.task.archivedAt != null },
+                            title = delta.task.title,
+                            notes = delta.task.notes,
+                            due_date = delta.task.dueDate?.value,
+                            rank = delta.task.rank.toLong(),
+                            created_at = delta.task.createdAt.toEpochMilliseconds(),
+                            archived_at = delta.task.archivedAt?.toEpochMilliseconds(),
+                        )
+                        is BoardDelta.DeleteTask -> queries.deleteTaskRow(delta.id.value)
+                    }
                 }
             }
+        } catch (failure: Exception) {
+            throw StorageError("Failed to persist board changes", failure)
         }
     }
 }

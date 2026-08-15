@@ -11,6 +11,7 @@ import __PACKAGE_NAME__.taskboard.Column
 import __PACKAGE_NAME__.taskboard.ColumnId
 import __PACKAGE_NAME__.taskboard.ColumnKind
 import __PACKAGE_NAME__.taskboard.EpochDay
+import __PACKAGE_NAME__.taskboard.StorageError
 import __PACKAGE_NAME__.taskboard.TaskBoardRepository
 import __PACKAGE_NAME__.taskboard.TaskId
 import __PACKAGE_NAME__.taskboard.TaskItem
@@ -67,7 +68,7 @@ open class RepositoryContractTest {
     fun `apply is atomic when a delta violates foreign keys`() = runTest {
         val repository = testRepository()
         repository.open()
-        assertFailsWith<Exception> {
+        assertFailsWith<StorageError> {
             repository.apply(
                 listOf(
                     BoardDelta.UpsertColumn(column(1)),

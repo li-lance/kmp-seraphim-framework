@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.filterNotNull
@@ -15,19 +16,28 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val store = (application as DailyBoardApplication).boardStore
+        val openError = mutableStateOf<String?>(null)
         setContent {
             MaterialTheme {
                 val snapshot by store.observe().filterNotNull().collectAsState(initial = null)
                 val columns = snapshot?.columns.orEmpty()
-                Text(if (columns.isEmpty()) "Loading..." else columns.joinToString(" / ") { it.name })
+                if (openError.value != null) {
+                    Text("Error: " + openError.value)
+                } else {
+                    Text(if (columns.isEmpty()) "Loading..." else columns.joinToString(" / ") { it.name })
+                }
             }
         }
         lifecycleScope.launch {
-            store.open()
-            val current = store.snapshot()
-            val start = current.columns.first()
-            if (current.tasks[start.id].orEmpty().isEmpty()) {
-                store.createTask(start.id, "First task")
+            try {
+                store.open()
+                val current = store.snapshot()
+                val start = current.columns.first()
+                if (current.tasks[start.id].orEmpty().isEmpty()) {
+                    store.createTask(start.id, "First task")
+                }
+            } catch (failure: Exception) {
+                openError.value = failure.message ?: failure.toString()
             }
         }
     }

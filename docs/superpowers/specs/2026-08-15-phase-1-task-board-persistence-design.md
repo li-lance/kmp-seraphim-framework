@@ -278,7 +278,7 @@ sealed class BoardError : RuntimeException() {
 ### 8.2 存储失败（repository 层）
 
 - `apply` 失败：SQLite 回滚 / IndexedDB abort → 异常冒泡给调用方；内存态不推进、快照不发布。
-- `open()` 失败（损坏、user_version 不符）：store 保持未初始化，`observe()` 抛 `StorageError`；平台显示明确错误页面而非崩溃，**不自动清库**（数据是用户财产）。
+- `open()` 失败（损坏、user_version 不符）：store 保持未初始化，初始化失败经 `open()` 的 `StorageError` 传播（StateFlow 无法携带异常，见 §7.1）；平台显示明确错误页面而非崩溃，**不自动清库**（数据是用户财产）。
 - 存储异常在边界包装为 `StorageError(cause)`，不把 SQLException / DOMException 泄漏给 UI。
 
 ### 8.3 自愈边界（仅限结构，不碰数据）
