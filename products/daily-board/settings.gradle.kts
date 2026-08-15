@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "daily-board"
 include(":shared:task-board", ":shared:local-data-sql", ":apps:android")
+

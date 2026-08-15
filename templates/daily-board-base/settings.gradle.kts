@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "__PRODUCT_ID__"
 include(":shared:task-board", ":shared:local-data-sql", ":apps:android")
+__WEB_MODULES__
