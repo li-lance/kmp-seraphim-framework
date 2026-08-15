@@ -30,6 +30,7 @@
 - Task 14 探针结论：wasm ABI 确实展开 vararg，`storeNamesArray` 产出扁平数组，定元助手不需要；探针留作回归守卫。
 - Task 14 的 wasm 编译器强制修正：Kotlin/Wasm 禁止非 external 类实现 external 接口（`Non-external type extends external type`），且 `Array<T>` 不能作 `@JsFun` 参数——fake 改为 JS 门面对象转发 Kotlin lambda（逻辑全在 Kotlin）；测试用 `WebTaskBoardRepository(factory.idbFactory)`；`jsArrayOf` 弃用改 `toJsArray()`；`unsafeCast` 改恒等 `@JsFun("(js) => js") asIdbFactory`。合约断言收紧为 `assertFailsWith<StorageError>`。
 - 本机 Node/Yarn 下载不可用（`FAIL_ON_PROJECT_REPOS` 挡住 node 下载仓库 + github 不可达）：本地跑 wasm 测试需在每次 createProduct 后对 scratch 认证树应用 `.superpowers/sdd/patch-cert.sh <fixture-root>`（settings 改 PREFER_PROJECT、根/模块 Node/Yarn EnvSpec download=false，用本机 node v26.7.0 + yarn 1.22.22）。该补丁只用于本地认证，不提交进模板（CI 可达 nodejs.org/github，无需补丁）；Task 15/18 的本地 wasm 验证同样需要。
+- Task 15 的 wasmJs 编译器强制修正：① class 级 `@JsExport` 被拒（`Applicable targets: function`）——Web 表面改为顶层导出函数 + `JsReference<T>` 不透明句柄（`createWebTaskBoardAdapter/subscribe/dispose`），spec §7.2 已同步；② wasmJs 上 `testScheduler.advanceUntilIdle()` 不驱动 `backgroundScope.launch`（探针证实），测试改用 `testScheduler.runCurrent()`。
 
 - Task 9 的 settings.gradle.kts 变更**不加入** `__WEB_MODULES__` token：渲染器在 Task 12 才求值该 token，而 GeneratedTreeVerifier 拒绝渲染树残留 `__`，Task 9 加入会使 createProduct 失败并阻断尖刺。Task 12 实现条件发射时须同时把 `__WEB_MODULES__` 行加入模板 settings.gradle.kts（web 未选时渲染为空行）。
 - Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。

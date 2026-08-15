@@ -240,14 +240,7 @@ SQL 三端共用一个 `SqlDelightTaskBoardRepository(schema, driver)` 实现（
 
 - **Android / Desktop**：`observe().collectAsState()`，UI 直接渲染不可变快照（Android 接线在本 spec，UI 在子系统⑤；Desktop 全在子系统②）。
 - **iOS**：`TaskBoardIosAdapter` 生命周期感知：`startObserving(onSnapshot: (BoardSnapshot) -> Unit)` 主线程分发，`stopObserving()` 取消。
-- **Web**：`task-board/wasmJsMain` 的 `WebTaskBoardAdapter`（`@JsExport`）暴露显式订阅 + 显式销毁 + JSON 快照，不泄漏 Flow 到 TS：
-  ```kotlin
-  @JsExport
-  class WebTaskBoardAdapter(private val store: TaskBoardStore) {
-      fun subscribe(onSnapshot: (String) -> Unit): WebSubscription  // JSON 序列化快照
-      fun dispose(sub: WebSubscription)
-  }
-  ```
+- **Web**：`task-board/wasmJsMain` 暴露显式订阅 + 显式销毁 + JSON 快照，不泄漏 Flow 到 TS。Kotlin 2.4.10 的 wasmJs 只支持函数级 `@JsExport`（class 级注解被编译器拒绝），因此表面为顶层导出函数 + `JsReference<T>` 不透明句柄：`createWebTaskBoardAdapter(store)` / `subscribe(adapter, onSnapshot)` / `dispose(adapter, subscription)`（语义与计划的类形式等价：显式订阅、显式销毁、JSON 序列化快照）。
   JSON 序列化手写（快照类型 `toJson()`），不引入 kotlinx-serialization。完整 TS 契约与真实浏览器测试归子系统③，届时此最小版迁入/扩展为父设计 §10 的 `shared/web-adapter`。
 
 ### 7.3 线程模型
