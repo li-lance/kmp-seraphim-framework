@@ -149,6 +149,36 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         publish()
     }
 
+    suspend fun moveTask(id: TaskId, toColumnId: ColumnId, toIndex: Int): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val taskIndex = tasks.indexOfFirst { it.id == id }
+        if (taskIndex < 0) throw BoardError.TaskNotFound(id)
+        val task = tasks[taskIndex]
+        if (task.archivedAt != null) throw BoardError.NotUpdatable(id)
+        if (columns.none { it.id == toColumnId }) throw BoardError.ColumnNotFound(toColumnId)
+        val fromColumnId = task.columnId
+        val fromList = columnTasks(fromColumnId).filterNot { it.id == id }
+        val targetList = (if (toColumnId == fromColumnId) fromList else columnTasks(toColumnId)).toMutableList()
+        if (toIndex < 0 || toIndex > targetList.size) throw BoardError.IndexOutOfRange(toIndex, targetList.size + 1)
+        if (toColumnId == fromColumnId && toIndex == task.rank) return@withLock publish()
+        targetList.add(toIndex, task.copy(columnId = toColumnId))
+        val targetRenumbered = targetList.mapIndexed { index, item -> item.copy(rank = index) }
+        val fromRenumbered =
+            if (toColumnId == fromColumnId) emptyList() else fromList.mapIndexed { index, item -> item.copy(rank = index) }
+        val newTasks = tasks.toMutableList()
+        newTasks.removeAll { it.archivedAt == null && (it.columnId == fromColumnId || it.columnId == toColumnId) }
+        newTasks.addAll(fromRenumbered + targetRenumbered)
+        repository.apply(
+            fromRenumbered.map { BoardDelta.UpsertTask(it) } + targetRenumbered.map { BoardDelta.UpsertTask(it) },
+        )
+        tasks = newTasks
+        publish()
+    }
+
+    private fun columnTasks(columnId: ColumnId): List<TaskItem> =
+        tasks.filter { it.archivedAt == null && it.columnId == columnId }
+            .sortedWith(compareBy({ it.rank }, { it.id.value }))
+
     private fun requireOpen() {
         if (!open) throw BoardError.NotOpen()
     }
