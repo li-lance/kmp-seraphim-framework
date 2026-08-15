@@ -76,7 +76,7 @@ class MoveTaskTest {
     }
 
     @Test
-    fun `moveTask rejects unknown tasks, columns and bad indexes`() = runTest {
+    fun `moveTask rejects unknown task and column ids and out of range indexes`() = runTest {
         val (store, repository) = openedStore()
         val startId = store.snapshot().columns.first().id
         store.createTask(startId, "A")
