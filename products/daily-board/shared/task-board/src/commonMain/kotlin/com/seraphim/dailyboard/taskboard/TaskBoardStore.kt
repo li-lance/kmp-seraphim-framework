@@ -1,5 +1,6 @@
 package com.seraphim.dailyboard.taskboard
 
+import kotlin.time.Clock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -81,6 +82,51 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         publish()
     }
 
+    suspend fun deleteColumn(id: ColumnId): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val index = columns.indexOfFirst { it.id == id }
+        if (index < 0) throw BoardError.ColumnNotFound(id)
+        if (columns[index].kind != ColumnKind.MIDDLE) throw BoardError.ColumnNotDeletable(id)
+        val now = Clock.System.now()
+        val archived = tasks.filter { it.columnId == id }.map { it.copy(archivedAt = now, rank = 0) }
+        val newColumns = renumberColumns(columns.filterNot { it.id == id })
+        val newTasks = tasks.filterNot { it.columnId == id } + archived
+        repository.apply(
+            listOf(BoardDelta.DeleteColumn(id)) +
+                archived.map { BoardDelta.UpsertTask(it) } +
+                columnDeltas(columns, newColumns),
+        )
+        columns = newColumns.toMutableList()
+        tasks = newTasks.toMutableList()
+        publish()
+    }
+
+    suspend fun createTask(
+        columnId: ColumnId,
+        title: String,
+        notes: String? = null,
+        dueDate: EpochDay? = null,
+    ): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val normalizedTitle = validateTitle(title)
+        val normalizedNotes = validateNotes(notes)
+        if (columns.none { it.id == columnId }) throw BoardError.ColumnNotFound(columnId)
+        val rank = tasks.count { it.archivedAt == null && it.columnId == columnId }
+        val task = TaskItem(
+            id = TaskId(nextTaskId++),
+            columnId = columnId,
+            title = normalizedTitle,
+            notes = normalizedNotes,
+            dueDate = dueDate,
+            rank = rank,
+            createdAt = Clock.System.now(),
+            archivedAt = null,
+        )
+        repository.apply(listOf(BoardDelta.UpsertTask(task)))
+        tasks.add(task)
+        publish()
+    }
+
     private fun requireOpen() {
         if (!open) throw BoardError.NotOpen()
     }
@@ -103,6 +149,19 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         val name = raw.trim()
         if (name.isEmpty() || name.length > MAX_COLUMN_NAME_LENGTH) throw BoardError.InvalidColumnName(raw)
         return name
+    }
+
+    private fun validateTitle(raw: String): String {
+        val title = raw.trim()
+        if (title.isEmpty() || title.length > MAX_TITLE_LENGTH) throw BoardError.InvalidTitle(raw)
+        return title
+    }
+
+    private fun validateNotes(raw: String?): String? {
+        if (raw == null) return null
+        val notes = raw.trim()
+        if (notes.length > MAX_NOTES_LENGTH) throw BoardError.InvalidNotes(raw)
+        return notes.ifEmpty { null }
     }
 
     private fun renumberColumns(list: List<Column>): List<Column> =
