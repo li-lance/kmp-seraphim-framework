@@ -26,6 +26,7 @@
 - Task 12 渲染器空 token 行处理：`__WEB_MODULES__`/`__WASM_JS_TARGET__` 展开为空时整行移除（按行过滤含 token 且展开后空白的行，其余行原样保留），避免生成文件结尾出现空行（违反「恰好一个换行符结尾」并触发 diff --check）；对应 ProductRendererTest 增加无空行残留断言。
 - Task 13 的 wasm 编译器强制修正（Kotlin 2.4.10 锁定工具链）：① local-data-web 的 JS interop 源码放 `src/wasmJsMain/`（`kotlin.JsFun`/`JsArray` 属 js/wasm 共享 stdlib，common 不可见）；② `import kotlin.JsFun`（2.4.10 根包，非 kotlin.js）；③ wasm interop 拒绝 `Array<T>`——事务参数用 `JsArray<JsAny>` + `@JsFun("(...names) => names")` vararg 助手；④ commonMain 补 `kotlinx-coroutines-core`（task-board 的 implementation 依赖不传递）；⑤ 行遍历用 `toJsArray(rows).toList().map`；⑥ 两文件加 `@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)`。
 - Task 13 顺带完成 Task 15 Step 1：`__WASM_JS_TARGET__` token 行已加入 task-board 模板 build.gradle.kts（web 夹具解析 wasm 变体需要）——Task 14/15 执行时改为「验证该行存在」而非插入。
+- Task 14 的两项运行时形状硬化（Task 13 评审 Important 项）：① `storeNamesArray` 的 vararg `@JsFun("(...names) => names")` 若 ABI 不展开会得到嵌套数组——Task 14 第一步用形状探针测试断言 `["columns","tasks"]` 扁平形状；若不通过，改用定元 `@JsFun("(a) => [a]")`/`@JsFun("(a, b) => [a, b]")` 助手；fake 必须按真实 IndexedDB 语义严格处理扁平字符串数组（不得模仿 rest 语义掩盖 bug）。② `awaitCompletion` 在真实浏览器中 onerror 与 onabort 连续触发导致 double-resume——用「已触发」标志守卫 resume 且仅当事务仍活跃时调用 abort()（catch 里 abort 前判断）。
 
 - Task 9 的 settings.gradle.kts 变更**不加入** `__WEB_MODULES__` token：渲染器在 Task 12 才求值该 token，而 GeneratedTreeVerifier 拒绝渲染树残留 `__`，Task 9 加入会使 createProduct 失败并阻断尖刺。Task 12 实现条件发射时须同时把 `__WEB_MODULES__` 行加入模板 settings.gradle.kts（web 未选时渲染为空行）。
 - Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。
