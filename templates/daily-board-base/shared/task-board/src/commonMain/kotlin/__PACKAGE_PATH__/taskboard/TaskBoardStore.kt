@@ -44,6 +44,43 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         _snapshot.value!!
     }
 
+    suspend fun createColumn(name: String): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val normalized = validateColumnName(name)
+        val insertionIndex = columns.size - 1
+        val column = Column(ColumnId(nextColumnId++), normalized, ColumnKind.MIDDLE, rank = insertionIndex)
+        val newColumns = renumberColumns(columns.toMutableList().apply { add(insertionIndex, column) })
+        repository.apply(columnDeltas(columns, newColumns))
+        columns = newColumns.toMutableList()
+        publish()
+    }
+
+    suspend fun renameColumn(id: ColumnId, name: String): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val normalized = validateColumnName(name)
+        val index = columns.indexOfFirst { it.id == id }
+        if (index < 0) throw BoardError.ColumnNotFound(id)
+        val updated = columns[index].copy(name = normalized)
+        repository.apply(listOf(BoardDelta.UpsertColumn(updated)))
+        columns[index] = updated
+        publish()
+    }
+
+    suspend fun moveColumn(id: ColumnId, toIndex: Int): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val fromIndex = columns.indexOfFirst { it.id == id }
+        if (fromIndex < 0) throw BoardError.ColumnNotFound(id)
+        if (columns[fromIndex].kind != ColumnKind.MIDDLE) throw BoardError.ColumnNotMovable(id)
+        if (toIndex < 1 || toIndex > columns.size - 2) throw BoardError.IndexOutOfRange(toIndex, columns.size)
+        val reordered = columns.toMutableList()
+        val moved = reordered.removeAt(fromIndex)
+        reordered.add(toIndex, moved)
+        val newColumns = renumberColumns(reordered)
+        repository.apply(columnDeltas(columns, newColumns))
+        columns = newColumns.toMutableList()
+        publish()
+    }
+
     private fun requireOpen() {
         if (!open) throw BoardError.NotOpen()
     }
@@ -61,4 +98,16 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
             archivedTasks = tasks.filter { it.archivedAt != null }.sortedByDescending { it.archivedAt },
         )
     }
+
+    private fun validateColumnName(raw: String): String {
+        val name = raw.trim()
+        if (name.isEmpty() || name.length > MAX_COLUMN_NAME_LENGTH) throw BoardError.InvalidColumnName(raw)
+        return name
+    }
+
+    private fun renumberColumns(list: List<Column>): List<Column> =
+        list.mapIndexed { index, column -> column.copy(rank = index, kind = columnKindAt(index, list.size)) }
+
+    private fun columnDeltas(old: List<Column>, new: List<Column>): List<BoardDelta> =
+        new.filterNot { column -> old.contains(column) }.map { BoardDelta.UpsertColumn(it) }
 }
