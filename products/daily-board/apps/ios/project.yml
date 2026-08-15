@@ -8,10 +8,14 @@ targets:
     deploymentTarget: "17.0"
     sources: [Sources]
     dependencies:
-      - framework: ../../shared/task-board/build/bin/iosSimulatorArm64/debugFramework/TaskBoardShared.framework
+      - framework: ../../shared/local-data-sql/build/bin/iosSimulatorArm64/debugFramework/LocalDataSql.framework
         embed: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.seraphim.dailyboard.ios
         CODE_SIGNING_ALLOWED: NO
         GENERATE_INFOPLIST_FILE: YES
+        CURRENT_PROJECT_VERSION: "1"
+        MARKETING_VERSION: "1.0"
+        # sqldelight native driver 的 sqlite3 cinterop 在 iOS 无 linkerOpts；静态 framework 不传播 linkerOpts，故由 app 自链
+        OTHER_LDFLAGS: -lsqlite3

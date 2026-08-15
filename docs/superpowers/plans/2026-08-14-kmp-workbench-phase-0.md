@@ -8,7 +8,7 @@
 
 **Architecture:** The root build orchestrates a target-neutral included `platform-kit` build and one JVM generator. The generator validates `project.yaml`, renders a product into a sibling temporary directory, performs structural verification, and atomically publishes it. The generated product declares official Android and iOS KMP targets directly; platform-kit supplies policy but never chooses targets.
 
-**Tech Stack:** Kotlin 2.4.10, Android Gradle Plugin 9.1.0, Gradle 9.3.1, JDK 17, Android SDK 37/minSdk 26, Compose BOM 2026.06.00, Xcode 26.4.x, SwiftUI, XcodeGen, SnakeYAML 2.5, kotlin.test, JUnit 5, Gradle TestKit, GitHub Actions.
+**Tech Stack:** Kotlin 2.4.10, Android Gradle Plugin 9.2.1, Gradle 9.4.1, JDK 17, Android SDK 37/minSdk 26, Compose BOM 2026.06.00, Xcode 26.4.x, SwiftUI, XcodeGen, SnakeYAML 2.5, kotlin.test, JUnit 5, Gradle TestKit, GitHub Actions.
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - The Android application is a separate `com.android.application` Module.
 - Shared Android targets use `com.android.kotlin.multiplatform.library` and `kotlin { android { ... } }`.
 - Generated Module files declare their official targets directly; no generic convention plugin may add Android implicitly.
-- Kotlin is exactly `2.4.10`; AGP is exactly `9.1.0`; Gradle is exactly `9.3.1`; JDK toolchain is `17`.
+- Kotlin is exactly `2.4.10`; AGP is exactly `9.2.1`; Gradle is exactly `9.4.1`; JDK toolchain is `17`.
 - Android `compileSdk` and `targetSdk` are `37`; `minSdk` is `26`.
 - Android host tests are enabled explicitly with `withHostTest` and use `androidHostTest`.
 - Phase 0 supports exactly Android+iOS with `local-only` data.
@@ -70,7 +70,7 @@ Authoritative references:
 - Create: `gradle/wrapper/gradle-wrapper.properties`
 
 **Interfaces:**
-- Produces: one root version catalog and Gradle 9.3.1 wrapper configuration.
+- Produces: one root version catalog and Gradle 9.4.1 wrapper configuration.
 - Produces: included build name `platform-kit` and JVM project `:tooling:generator`.
 - Consumes: no implementation files from later tasks.
 
@@ -111,7 +111,7 @@ if (file("products/daily-board/settings.gradle.kts").isFile) {
 # gradle/libs.versions.toml
 [versions]
 kotlin = "2.4.10"
-agp = "9.1.0"
+agp = "9.2.1"
 composeBom = "2026.06.00"
 activityCompose = "1.12.2"
 snakeyaml = "2.5"
@@ -158,7 +158,7 @@ android.builtInKotlin=true
 # gradle/wrapper/gradle-wrapper.properties
 distributionBase=GRADLE_USER_HOME
 distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-9.3.1-bin.zip
+distributionUrl=https\://mirrors.cloud.tencent.com/gradle/gradle-9.4.1-bin.zip
 networkTimeout=10000
 validateDistributionUrl=true
 zipStoreBase=GRADLE_USER_HOME
@@ -170,11 +170,11 @@ zipStorePath=wrapper/dists
 Run:
 
 ```bash
-gradle wrapper --gradle-version 9.3.1 --distribution-type bin
+gradle wrapper --gradle-version 9.4.1 --distribution-type bin
 ./gradlew --version
 ```
 
-Expected: the second command reports Gradle `9.3.1` and JVM `17` or newer.
+Expected: the second command reports Gradle `9.4.1` and JVM `17` or newer.
 
 - [ ] **Step 5: Commit the build baseline**
 

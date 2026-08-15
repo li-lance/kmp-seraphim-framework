@@ -15,17 +15,40 @@ object ProductRenderer {
     fun render(request: RenderRequest): Path {
         requireDestination(request.output)
         request.output.parent.createDirectories()
-        val temporary = Files.createTempDirectory(request.output.parent, ".${request.output.name}-")
+        val temporary = Files.createTempDirectory(request.output.parent, "." + request.output.name + "-")
         try {
+            val webSelected = request.manifest.platforms.web
+            val webToolDistributionRepos = listOf(
+                "ivy {",
+                "            name = \"Node.js Distributions\"",
+                "            url = uri(\"https://nodejs.org/dist\")",
+                "            patternLayout { artifact(\"v[revision]/[artifact](-v[revision]-[classifier]).[ext]\") }",
+                "            metadataSources { artifact() }",
+                "            content { includeModule(\"org.nodejs\", \"node\") }",
+                "        }",
+                "        ivy {",
+                "            name = \"Yarn Distributions\"",
+                "            url = uri(\"https://github.com/yarnpkg/yarn/releases/download\")",
+                "            patternLayout { artifact(\"v[revision]/[artifact](-v[revision]).[ext]\") }",
+                "            metadataSources { artifact() }",
+                "            content { includeModule(\"com.yarnpkg\", \"yarn\") }",
+                "        }",
+            ).joinToString("\n")
             val tokens = mapOf(
                 "__PRODUCT_ID__" to request.manifest.product.id,
                 "__PACKAGE_NAME__" to request.manifest.product.packageName,
                 "__PACKAGE_PATH__" to request.manifest.product.packageName.replace('.', '/'),
                 "__PLATFORM_KIT_PATH__" to request.platformKitPath,
+                "__WEB_MODULES__" to if (webSelected) "include(\":shared:local-data-web\")" else "",
+                "__WASM_JS_TARGET__" to if (webSelected) "wasmJs { nodejs() }" else "",
+                "__REPOSITORIES_MODE__" to if (webSelected) "PREFER_SETTINGS" else "FAIL_ON_PROJECT_REPOS",
+                "__WEB_TOOL_REPOS__" to if (webSelected) webToolDistributionRepos else "",
             )
             Files.walk(request.template).use { paths ->
                 paths.sorted().forEach { source ->
-                    val relativeText = tokens.entries.fold(request.template.relativize(source).toString()) { value, token ->
+                    val relative = request.template.relativize(source)
+                    if (!webSelected && isWebOnly(relative)) return@forEach
+                    val relativeText = tokens.entries.fold(relative.toString()) { value, token ->
                         value.replace(token.key, token.value)
                     }
                     val target = temporary.resolve(relativeText)
@@ -33,9 +56,15 @@ object ProductRenderer {
                         source.isDirectory() -> target.createDirectories()
                         source.isRegularFile() -> {
                             target.parent.createDirectories()
-                            val rendered = tokens.entries.fold(source.readText()) { value, token ->
-                                value.replace(token.key, token.value)
+                            val renderedLines = source.readText().split("\n").filterNot { line ->
+                                tokens.keys.any { line.contains(it) } &&
+                                    tokens.entries.fold(line) { value, token ->
+                                        value.replace(token.key, token.value)
+                                    }.isBlank()
                             }
+                            val rendered = tokens.entries.fold(
+                                renderedLines.joinToString("\n"),
+                            ) { value, token -> value.replace(token.key, token.value) }
                             target.writeText(rendered)
                         }
                     }
@@ -49,6 +78,12 @@ object ProductRenderer {
             temporary.toFile().deleteRecursively()
             throw failure
         }
+    }
+
+    private fun isWebOnly(relative: Path): Boolean {
+        val segments = relative.map { it.toString() }
+        return segments.contains("wasmJsMain") || segments.contains("wasmJsTest") ||
+            (segments.size >= 2 && segments[0] == "shared" && segments[1] == "local-data-web")
     }
 
     private fun requireDestination(output: Path) {

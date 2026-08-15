@@ -15,6 +15,7 @@ android {
 
 dependencies {
     implementation(project(":shared:task-board"))
+    implementation(project(":shared:local-data-sql"))
     implementation(libs.activity.compose)
     implementation(platform(libs.compose.bom))
     implementation("androidx.compose.material3:material3")

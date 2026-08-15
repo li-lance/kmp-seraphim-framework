@@ -5,13 +5,16 @@ object ManifestValidator {
     private val packageName = Regex("[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+")
 
     fun requireSupported(manifest: ProjectManifest) {
-        require(manifest.schema == 1) { "Unsupported manifest schema: ${manifest.schema}" }
+        require(manifest.schema == 1) { "Unsupported manifest schema: " + manifest.schema }
         require(productId.matches(manifest.product.id)) { "Invalid product id" }
         require(packageName.matches(manifest.product.packageName)) { "Invalid package name" }
-        require(
-            manifest.platforms.android && manifest.platforms.ios &&
-                !manifest.platforms.desktop && !manifest.platforms.web &&
-                manifest.data.strategy == "local-only"
-        ) { "Phase 0 supports exactly Android+iOS with local-only data" }
+        require(manifest.data.strategy == "local-only") {
+            "Unsupported data strategy: " + manifest.data.strategy
+        }
+        val platforms = manifest.platforms
+        val supported = platforms.android && platforms.ios && !platforms.desktop
+        require(supported) {
+            "Supported platforms are Android+iOS, optionally with Web; desktop is not yet supported"
+        }
     }
 }

@@ -22,15 +22,24 @@ class ManifestTest {
     }
 
     @Test
-    fun `rejects a Web target before writing`() {
+    fun `accepts Android+iOS with Web`() {
         val file = directory.resolve("project.yaml")
         file.writeText(SUPPORTED.replace("web: false", "web: true"))
+        ManifestValidator.requireSupported(ManifestReader.read(file))
+    }
 
-        val error = assertFailsWith<IllegalArgumentException> {
+    @Test
+    fun `rejects desktop-only and android-only selections`() {
+        val file = directory.resolve("project.yaml")
+        file.writeText(SUPPORTED.replace("android: true", "android: false"))
+        assertFailsWith<IllegalArgumentException> {
             ManifestValidator.requireSupported(ManifestReader.read(file))
         }
-
-        assertEquals("Phase 0 supports exactly Android+iOS with local-only data", error.message)
+        val desktop = directory.resolve("desktop.yaml")
+        desktop.writeText(SUPPORTED.replace("desktop: false", "desktop: true"))
+        assertFailsWith<IllegalArgumentException> {
+            ManifestValidator.requireSupported(ManifestReader.read(desktop))
+        }
     }
 
     private companion object {

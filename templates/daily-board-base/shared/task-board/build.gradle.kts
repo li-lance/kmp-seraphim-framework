@@ -23,8 +23,16 @@ kotlin {
             isStatic = true
         }
     }
+    __WASM_JS_TARGET__
     sourceSets {
-        commonTest.dependencies { implementation(kotlin("test")) }
+        commonMain.dependencies {
+            // api：task-board 被 LocalDataSql.framework export，传递依赖须为 API 可见（K/N 单运行时修正）
+            api(libs.kotlinx.coroutines.core)
+        }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+        }
         named("androidHostTest") {
             dependencies {
                 implementation(kotlin("test"))

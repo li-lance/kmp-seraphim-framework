@@ -101,8 +101,8 @@ The Phase 0 compatibility lock is:
 | Tool | Version |
 | --- | --- |
 | Kotlin | 2.4.10 |
-| Android Gradle Plugin | 9.1.0 |
-| Gradle | 9.3.1 |
+| Android Gradle Plugin | 9.2.1 |
+| Gradle | 9.4.1 |
 | JDK | 17 |
 | Android compileSdk/targetSdk | 37 |
 | Android minSdk | 26 |
@@ -201,8 +201,8 @@ templateCatalog: 1.0.0
 platformKit: 1.0.0
 toolchain:
   kotlin: 2.4.10
-  agp: 9.1.0
-  gradle: 9.3.1
+  agp: 9.2.1
+  gradle: 9.4.1
 ```
 
 Publishing platform-kit as an external plugin artifact is deferred until a second real product demonstrates sufficient reuse.

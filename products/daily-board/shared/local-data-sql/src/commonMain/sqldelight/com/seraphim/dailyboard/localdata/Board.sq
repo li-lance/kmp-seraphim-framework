@@ -1,0 +1,38 @@
+CREATE TABLE board_column (
+    id INTEGER NOT NULL PRIMARY KEY,
+    name TEXT NOT NULL,
+    rank INTEGER NOT NULL
+);
+
+CREATE TABLE task (
+    id INTEGER NOT NULL PRIMARY KEY,
+    column_id INTEGER REFERENCES board_column(id),
+    title TEXT NOT NULL,
+    notes TEXT,
+    due_date INTEGER,
+    rank INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    archived_at INTEGER
+);
+
+CREATE INDEX task_by_column ON task(column_id, rank);
+CREATE INDEX task_by_archived ON task(archived_at);
+
+selectColumns:
+SELECT * FROM board_column ORDER BY rank;
+
+selectTasks:
+SELECT * FROM task;
+
+upsertColumn:
+INSERT OR REPLACE INTO board_column(id, name, rank) VALUES (?, ?, ?);
+
+deleteColumnRow:
+DELETE FROM board_column WHERE id = ?;
+
+upsertTask:
+INSERT OR REPLACE INTO task(id, column_id, title, notes, due_date, rank, created_at, archived_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+deleteTaskRow:
+DELETE FROM task WHERE id = ?;

@@ -38,6 +38,8 @@ jobs:
       - run: brew install xcodegen
       - run: ./gradlew createProduct -Pmanifest=project.yaml -Poutput=build/certification-ios
       - run: ./gradlew -p build/certification-ios :shared:task-board:linkDebugFrameworkIosSimulatorArm64
+      - run: ./gradlew -p build/certification-ios :shared:local-data-sql:linkDebugFrameworkIosSimulatorArm64
+      - run: ./gradlew -p build/certification-ios :shared:task-board:iosSimulatorArm64Test :shared:local-data-sql:iosSimulatorArm64Test
       - run: xcodegen generate --spec build/certification-ios/apps/ios/project.yml
       - run: >-
           xcodebuild
