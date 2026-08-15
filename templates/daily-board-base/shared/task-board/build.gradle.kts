@@ -25,6 +25,10 @@ kotlin {
     }
     sourceSets {
         commonTest.dependencies { implementation(kotlin("test")) }
-        androidHostTest.dependencies { implementation(kotlin("test")) }
+        named("androidHostTest") {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }

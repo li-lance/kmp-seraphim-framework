@@ -1,4 +1,7 @@
-plugins { base }
+plugins {
+    base
+    alias(libs.plugins.kotlin.jvm) apply false
+}
 
 val generatorRuntime by configurations.creating
 
