@@ -127,6 +127,28 @@ class TaskBoardStore(private val repository: TaskBoardRepository) {
         publish()
     }
 
+    suspend fun updateTask(
+        id: TaskId,
+        title: String? = null,
+        notes: String? = null,
+        dueDate: EpochDay? = null,
+        clearDueDate: Boolean = false,
+    ): BoardSnapshot = mutex.withLock {
+        requireOpen()
+        val index = tasks.indexOfFirst { it.id == id }
+        if (index < 0) throw BoardError.TaskNotFound(id)
+        val current = tasks[index]
+        if (current.archivedAt != null) throw BoardError.NotUpdatable(id)
+        if (title == null && notes == null && dueDate == null && !clearDueDate) return@withLock publish()
+        val newTitle = title?.let { validateTitle(it) } ?: current.title
+        val newNotes = if (notes != null) validateNotes(notes) else current.notes
+        val newDueDate = if (clearDueDate) null else dueDate ?: current.dueDate
+        val updated = current.copy(title = newTitle, notes = newNotes, dueDate = newDueDate)
+        repository.apply(listOf(BoardDelta.UpsertTask(updated)))
+        tasks[index] = updated
+        publish()
+    }
+
     private fun requireOpen() {
         if (!open) throw BoardError.NotOpen()
     }
