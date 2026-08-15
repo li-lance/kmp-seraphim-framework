@@ -16,6 +16,7 @@
 - `BoardError.NotOpen` 是普通 class（Kotlin 不允许零参 data class），名称/消息/层级不变。
 - 本机执行 Gradle 前需 `export ANDROID_HOME=/Users/lanceli/Library/Android/sdk`（会话环境未设置该变量）。
 - `Instant.now()` 在锁定 Kotlin 2.4.10 下是 deprecation ERROR：一律用 `kotlin.time.Clock.System.now()` 替代（Task 5/7 的实现与测试代码同样适用）。
+- Task 5 的 updateTask 实现中，notes 的语义修正为：参数非 null 时以校验结果为准（"" 归一化为 null = 清空），null 表示不变——实现写 `if (notes != null) validateNotes(notes) else current.notes`（计划原文的 `?.let ?: current.notes` 在清空场景吞掉 null，已被实现修正）。
 
 ## Global Constraints
 
