@@ -6,7 +6,7 @@
 
 **Architecture:** 共享 TaskBoardStore 持有规范内存状态（Mutex 串行化），命令经业务校验后以整行 upsert/delete delta 事务化写入 TaskBoardRepository 端口，提交成功才推进 StateFlow 快照。SQL 三端（android/ios，jvm 随子系统②）共用 SQLDelight 生成查询；Web 端用 typed external interface + @JsFun 封装 IndexedDB。web 未选时 wasm target 与 web 存储模块经条件 token/过滤规则完全缺席。
 
-**Tech Stack:** Kotlin 2.4.10、AGP 9.1.0（KMP library 插件 + withHostTest）、SQLDelight 2.2.1、kotlinx-coroutines 1.11.0、Robolectric 4.16.1、Kotlin/Wasm（wasmJs nodejs 测试）。
+**Tech Stack:** Kotlin 2.4.10、AGP 9.2.1（KMP library 插件 + withHostTest）、SQLDelight 2.2.1、kotlinx-coroutines 1.11.0、Robolectric 4.16.1、Kotlin/Wasm（wasmJs nodejs 测试）。
 
 **Spec:** [2026-08-15-phase-1-task-board-persistence-design.md](../specs/2026-08-15-phase-1-task-board-persistence-design.md)
 
@@ -42,7 +42,7 @@
 
 ## Global Constraints
 
-- 工具链锁定：Kotlin 2.4.10 / AGP 9.1.0 / Gradle 9.3.1 / JDK 17 / compileSdk 37 / targetSdk 37 / minSdk 26 / Xcode 26.4.x。任何升级须整个元组互证。
+- 工具链锁定：Kotlin 2.4.10 / AGP 9.2.1 / Gradle 9.4.1 / JDK 17 / compileSdk 37 / targetSdk 37 / minSdk 26 / Xcode 26.4.x。任何升级须整个元组互证。
 - 新依赖版本：kotlinx-coroutines 1.11.0、SQLDelight 2.2.1（runtime + android-driver + native-driver）、Robolectric 4.16.1。
 - 共享插件须在根 plugins 块 apply false 提升（ADR）；本计划新增插件只被单模块应用（sqldelight → 仅 local-data-sql），无需提升。
 - 模板只发射已选平台：web 未选时 local-data-web 模块、wasmJs target、wasmJsMain 源目录必须完全缺席（不变量 3）。

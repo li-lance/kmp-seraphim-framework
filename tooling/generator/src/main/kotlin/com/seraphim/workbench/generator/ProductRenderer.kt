@@ -18,6 +18,22 @@ object ProductRenderer {
         val temporary = Files.createTempDirectory(request.output.parent, "." + request.output.name + "-")
         try {
             val webSelected = request.manifest.platforms.web
+            val webToolDistributionRepos = listOf(
+                "ivy {",
+                "            name = \"Node.js Distributions\"",
+                "            url = uri(\"https://nodejs.org/dist\")",
+                "            patternLayout { artifact(\"v[revision]/[artifact](-v[revision]-[classifier]).[ext]\") }",
+                "            metadataSources { artifact() }",
+                "            content { includeModule(\"org.nodejs\", \"node\") }",
+                "        }",
+                "        ivy {",
+                "            name = \"Yarn Distributions\"",
+                "            url = uri(\"https://github.com/yarnpkg/yarn/releases/download\")",
+                "            patternLayout { artifact(\"v[revision]/[artifact](-v[revision]).[ext]\") }",
+                "            metadataSources { artifact() }",
+                "            content { includeModule(\"com.yarnpkg\", \"yarn\") }",
+                "        }",
+            ).joinToString("\n")
             val tokens = mapOf(
                 "__PRODUCT_ID__" to request.manifest.product.id,
                 "__PACKAGE_NAME__" to request.manifest.product.packageName,
@@ -25,6 +41,8 @@ object ProductRenderer {
                 "__PLATFORM_KIT_PATH__" to request.platformKitPath,
                 "__WEB_MODULES__" to if (webSelected) "include(\":shared:local-data-web\")" else "",
                 "__WASM_JS_TARGET__" to if (webSelected) "wasmJs { nodejs() }" else "",
+                "__REPOSITORIES_MODE__" to if (webSelected) "PREFER_SETTINGS" else "FAIL_ON_PROJECT_REPOS",
+                "__WEB_TOOL_REPOS__" to if (webSelected) webToolDistributionRepos else "",
             )
             Files.walk(request.template).use { paths ->
                 paths.sorted().forEach { source ->

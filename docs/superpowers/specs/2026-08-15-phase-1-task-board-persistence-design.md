@@ -58,7 +58,7 @@ products/daily-board/shared/
 - Android app 依赖 `task-board + local-data-sql`；iOS app 只链接 `LocalDataSql.framework`（task-board 经 `export(project(":shared:task-board"))` + `transitiveExport = true` 并入该 framework——K/N 要求一个进程只嵌入一份 Kotlin 运行时，两个静态 framework 同链会在加载期 `injectToRuntime` 断言崩溃，Task 17 已按此修正）；未来的 Web app 依赖 `task-board + local-data-web`。
 - **模块拆分理由**：SQLDelight Gradle 插件与 `wasmJs` target 无法在同一模块干净解耦；两个存储引擎的目标约束完全不同（SQL 三端 vs 浏览器单端）。父设计 §10 规定「不同目标约束」是成立新 Module 的正当理由。此拆法也保证：web 未选时，`local-data-web` 模块、`wasmJs` target、`wasmJsMain` 源目录全部缺席（不变量 3）。
 - 新增依赖：`kotlinx-coroutines-core`（Flow，全 target 含 wasmJs）。不引入 kotlinx-datetime、kotlinx-serialization。
-- 版本目录新增：coroutines、SQLDelight（plugin + android/native drivers）、Robolectric。具体版本按 [toolchain policy](../../../CONTEXT.md) 的「兼容交集」原则在计划阶段锁定并验证（Kotlin 2.4.10 / AGP 9.1.0 / Gradle 9.3.1）。
+- 版本目录新增：coroutines、SQLDelight（plugin + android/native drivers）、Robolectric。具体版本按 [toolchain policy](../../../CONTEXT.md) 的「兼容交集」原则在计划阶段锁定并验证（Kotlin 2.4.10 / AGP 9.2.1 / Gradle 9.4.1）。
 - SQLDelight 插件只被 `local-data-sql` 一个模块应用，无需根提升；跨模块共享插件仍遵守 [root plugin classloader hoisting ADR](../../adr/2026-08-15-root-plugin-classloader-hoisting.md)。
 
 ### 4.2 分层与数据流（有状态 Store + 事务化 Repository）
@@ -329,6 +329,15 @@ certify 脚本渲染该夹具到 `build/certification/daily-board-web`，运行 
 ### 9.4 渲染器改动
 
 `ProductRenderer` 的 token 表增加两枚条件 token，`Files.walk` 增加上述过滤谓词；渲染 web:true/false 两种 manifest 的生成树结构测试补齐。
+
+### 9.5 工具发行版仓库策略（web 夹具）
+
+Gradle 9.4+ 在 `FAIL_ON_PROJECT_REPOS` 下拒绝 KGP 为下载 Node/Yarn 发行版而临时注入的 project 仓库（报 `added by unknown code`）；`PREFER_SETTINGS` 下 `detachedConfiguration` 又只解析 settings 仓库。因此 web:true 产品固定：
+
+- `repositoriesMode = PREFER_SETTINGS`（非 web 产品维持 `FAIL_ON_PROJECT_REPOS`）；
+- settings `dependencyResolutionManagement` 声明两个仅 artifact 元数据的 ivy 工具发行版仓库：`org.nodejs:node`（`https://nodejs.org/dist`，pattern `v[revision]/[artifact](-v[revision]-[classifier]).[ext]`）与 `com.yarnpkg:yarn`（`https://github.com/yarnpkg/yarn/releases/download`，pattern `v[revision]/[artifact](-v[revision]).[ext]`）。
+
+渲染器相应新增 `__REPOSITORIES_MODE__` 与 `__WEB_TOOL_REPOS__` 条件 token（web:false 时整行剔除，仓库列表与模式不变）；依赖仓库仍只由 settings 声明 google() + mavenCentral()，工具发行版仓库仅服务 Node/Yarn 下载，`content` 过滤器限定模块坐标。
 
 ## 10. 测试与认证
 

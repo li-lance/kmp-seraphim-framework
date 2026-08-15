@@ -8,10 +8,11 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.__REPOSITORIES_MODE__)
     repositories {
         google()
         mavenCentral()
+        __WEB_TOOL_REPOS__
     }
 }
 

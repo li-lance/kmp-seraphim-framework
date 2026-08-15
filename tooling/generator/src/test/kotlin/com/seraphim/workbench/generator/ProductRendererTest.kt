@@ -57,7 +57,17 @@ class ProductRendererTest {
 
     private fun webTemplate(): Path {
         val template = directory.resolve("web-template").createDirectories()
-        template.resolve("settings.gradle.kts").writeText("include(\":shared:task-board\")\n__WEB_MODULES__")
+        template.resolve("settings.gradle.kts").writeText(
+            "dependencyResolutionManagement {\n" +
+                "    repositoriesMode.set(RepositoriesMode.__REPOSITORIES_MODE__)\n" +
+                "    repositories {\n" +
+                "        google()\n" +
+                "        __WEB_TOOL_REPOS__\n" +
+                "    }\n" +
+                "}\n" +
+                "include(\":shared:task-board\")\n" +
+                "__WEB_MODULES__",
+        )
         template.resolve("shared/local-data-web").createDirectories()
         template.resolve("shared/local-data-web/build.gradle.kts").writeText("plugins { id(\"web\") }")
         template.resolve("shared/local-data-sql").createDirectories()
@@ -79,6 +89,11 @@ class ProductRendererTest {
         assertTrue(output.resolve("settings.gradle.kts").readText().contains("include(\":shared:local-data-web\")"))
         assertTrue(output.resolve("shared/task-board/build.gradle.kts").readText().contains("wasmJs { nodejs() }"))
         assertTrue(output.resolve("shared/task-board/src/wasmJsMain/Web.kt").isRegularFile())
+        val settings = output.resolve("settings.gradle.kts").readText()
+        assertTrue(settings.contains("RepositoriesMode.PREFER_SETTINGS"))
+        assertTrue(settings.contains("Node.js Distributions"))
+        assertTrue(settings.contains("Yarn Distributions"))
+        assertFalse(settings.contains("__"))
     }
 
     @Test
@@ -93,9 +108,17 @@ class ProductRendererTest {
         assertFalse(output.resolve("shared/task-board/build.gradle.kts").readText().contains("__"))
         // 空展开的 token 行应整行移除：settings 恰好一个结尾换行、无残留空行
         assertEquals(
-            "include(\":shared:task-board\")",
+            "dependencyResolutionManagement {\n" +
+                "    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n" +
+                "    repositories {\n" +
+                "        google()\n" +
+                "    }\n" +
+                "}\n" +
+                "include(\":shared:task-board\")",
             output.resolve("settings.gradle.kts").readText(),
         )
+        assertFalse(output.resolve("settings.gradle.kts").readText().contains("PREFER_SETTINGS"))
+        assertFalse(output.resolve("settings.gradle.kts").readText().contains("nodejs.org"))
         assertEquals("kotlin {\n}", output.resolve("shared/task-board/build.gradle.kts").readText())
     }
 
