@@ -10,6 +10,12 @@
 
 **Spec:** [2026-08-15-phase-1-task-board-persistence-design.md](../specs/2026-08-15-phase-1-task-board-persistence-design.md)
 
+## Plan Errata
+
+- 计划命令中的 `:shared:<module>:androidHostTest` 任务名在 AGP 9.1 KMP 工具链下实际为 `testAndroidHostTest`（源集名仍为 `androidHostTest`）；所有任务按 `testAndroidHostTest` 执行。
+- `BoardError.NotOpen` 是普通 class（Kotlin 不允许零参 data class），名称/消息/层级不变。
+- 本机执行 Gradle 前需 `export ANDROID_HOME=/Users/lanceli/Library/Android/sdk`（会话环境未设置该变量）。
+
 ## Global Constraints
 
 - 工具链锁定：Kotlin 2.4.10 / AGP 9.1.0 / Gradle 9.3.1 / JDK 17 / compileSdk 37 / targetSdk 37 / minSdk 26 / Xcode 26.4.x。任何升级须整个元组互证。
