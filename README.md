@@ -18,3 +18,13 @@
 - Web 使用独立 TypeScript UI，通过窄接口调用 Kotlin/Wasm。
 - 默认后端使用 Ktor/JVM 和 PostgreSQL，但同步协议不绑定后端实现。
 - Phase 0 只建立工作台、生成器和 Android+iOS 最小纵向切片。
+
+## Verify Phase 0
+
+```bash
+./gradlew -p platform-kit test
+./gradlew :tooling:generator:test
+scripts/certify-generated-product.sh
+```
+
+The iOS certification command is encoded in `.github/workflows/certify-phase-0.yml` and runs on `macos-26`.

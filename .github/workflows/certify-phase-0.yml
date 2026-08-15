@@ -1,0 +1,48 @@
+# .github/workflows/certify-phase-0.yml
+name: Certify Phase 0
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  generator-and-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew -p platform-kit test
+      - run: ./gradlew :tooling:generator:test
+      - run: scripts/certify-generated-product.sh
+
+  ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v6
+      - run: brew install xcodegen
+      - run: ./gradlew createProduct -Pmanifest=project.yaml -Poutput=build/certification-ios
+      - run: ./gradlew -p build/certification-ios :shared:task-board:linkDebugFrameworkIosSimulatorArm64
+      - run: xcodegen generate --spec build/certification-ios/apps/ios/project.yml
+      - run: >-
+          xcodebuild
+          -project build/certification-ios/apps/ios/DailyBoard.xcodeproj
+          -scheme DailyBoard
+          -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          CODE_SIGNING_ALLOWED=NO
+          build

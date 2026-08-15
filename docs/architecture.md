@@ -2,27 +2,25 @@
 
 ## Current state
 
-The repository contains the domain context, an approved multi-project Workbench design, and implementation plans. It does not yet contain the planned Gradle builds, generator, templates, or reference Product. The [Phase 0 plan](superpowers/plans/2026-08-14-kmp-workbench-phase-0.md) is the executable source for creating that baseline; planned files are not current implementation.
+Phase 0 implements the root orchestration build, target-neutral platform-kit, Manifest validation, structural Render transaction, Android+iOS daily-board template, maintained reference Product, and clean certification entry point. Desktop, Web/Wasm, persistence, backend, authentication, synchronization, migration, and standalone CLI export remain outside the implemented baseline.
 
-## Target composition
-
-The approved architecture separates five responsibilities:
+## Phase 0 composition
 
 ```text
 project.yaml
     ↓
-tooling/manifest → tooling/generator → generated Product
-                         ↑                  ↓
-templates/ ─────────────┘             platform certification
-                         ↑
-platform-kit/ supplies build policy without selecting Product topology
+tooling/generator → products/daily-board
+        ↑                    ↓
+templates/           Android and iOS certification
+        ↑
+platform-kit supplies build policy without selecting Product topology
 ```
 
 - The Workbench root orchestrates generation and certification.
-- `tooling/` parses the Manifest, resolves a deterministic template plan, renders into a temporary directory, verifies structure, and publishes atomically.
+- `tooling/generator` validates the Manifest, resolves the template, renders into a sibling temporary directory, verifies structure, and publishes atomically.
 - `platform-kit/` supplies compiler, build, quality, and test policy through an included build.
-- `templates/` contains only combinations proven by real Products and clean certification.
-- `products/` contains independently buildable reference Products.
+- `templates/daily-board-base/` owns the certified Android+iOS template.
+- `products/daily-board/` is the independently buildable reference Product.
 
 The approved detailed design is [KMP Multi-Project Workbench Design](superpowers/specs/2026-08-14-kmp-multi-project-workbench-design.md). [CONTEXT.md](../CONTEXT.md) owns domain definitions and invariants.
 
