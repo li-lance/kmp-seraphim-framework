@@ -23,7 +23,7 @@
 - Task 9 仓库实现用生成属性 `boardQueries` 而非计划原文的 `taskBoardDatabaseQueries`：SQLDelight 按 .sq 文件名（Board.sq）生成查询属性名。
 - Android 驱动回调签名：SQLDelight 2.2.1 的 `AndroidSqliteDriver.Callback.onConfigure` 参数为 `androidx.sqlite.db.SupportSQLiteDatabase`（非 `android.database.sqlite.SQLiteDatabase`）。
 - Robolectric 冒烟测试第二条用例须写 `kotlinx.coroutines.runBlocking<Unit>`：JUnit 4 校验测试方法必须返回 void，`runBlocking {}` 的尾表达式（deleteDatabase 返回 Boolean）会触发 InvalidTestClassError。
-- 发现（非本任务引入，Task 1 遗留）：task-board commonMain 的 `@JvmInline` 与 `java.lang.Math.floorDiv` 在非 JVM target 无法编译（native/wasm 编译报 Unresolved reference）；Task 1-8 只跑过 androidHostTest 故未暴露，Task 15/17 前需修复。
+- 发现（非本任务引入，Task 1 遗留）：task-board commonMain 的 `Math.floorDiv`（java.lang.Math）在非 JVM target 无法编译；已改用纯 Kotlin 算术 `millis / 86_400_000L` + 余数为负时减一（`@JvmInline` 本身跨 target 可用），随 Task 9 修复提交。
 
 ## Global Constraints
 
@@ -184,8 +184,12 @@ value class EpochDay(val value: Long) {
     val epochMillis: Long get() = value * 86_400_000L
 
     companion object {
-        fun fromInstant(instant: Instant): EpochDay =
-            EpochDay(Math.floorDiv(instant.toEpochMilliseconds(), 86_400_000L))
+        fun fromInstant(instant: Instant): EpochDay {
+            val millis = instant.toEpochMilliseconds()
+            val day = millis / 86_400_000L
+            val remainder = millis % 86_400_000L
+            return EpochDay(if (remainder < 0) day - 1 else day)
+        }
     }
 }
 

@@ -13,8 +13,12 @@ value class EpochDay(val value: Long) {
     val epochMillis: Long get() = value * 86_400_000L
 
     companion object {
-        fun fromInstant(instant: Instant): EpochDay =
-            EpochDay(Math.floorDiv(instant.toEpochMilliseconds(), 86_400_000L))
+        fun fromInstant(instant: Instant): EpochDay {
+            val millis = instant.toEpochMilliseconds()
+            val day = millis / 86_400_000L
+            val remainder = millis % 86_400_000L
+            return EpochDay(if (remainder < 0) day - 1 else day)
+        }
     }
 }
 
