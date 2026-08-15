@@ -55,7 +55,7 @@ products/daily-board/shared/
 ```
 
 - 依赖方向：`local-data-sql → task-board`、`local-data-web → task-board`（实现依赖端口，端口与规则同住 task-board，与父设计 §10「task-board 持 rules/state/ports」一致）。
-- Android/iOS app 依赖 `task-board + local-data-sql`；未来的 Web app 依赖 `task-board + local-data-web`。
+- Android app 依赖 `task-board + local-data-sql`；iOS app 只链接 `LocalDataSql.framework`（task-board 经 `export(project(":shared:task-board"))` + `transitiveExport = true` 并入该 framework——K/N 要求一个进程只嵌入一份 Kotlin 运行时，两个静态 framework 同链会在加载期 `injectToRuntime` 断言崩溃，Task 17 已按此修正）；未来的 Web app 依赖 `task-board + local-data-web`。
 - **模块拆分理由**：SQLDelight Gradle 插件与 `wasmJs` target 无法在同一模块干净解耦；两个存储引擎的目标约束完全不同（SQL 三端 vs 浏览器单端）。父设计 §10 规定「不同目标约束」是成立新 Module 的正当理由。此拆法也保证：web 未选时，`local-data-web` 模块、`wasmJs` target、`wasmJsMain` 源目录全部缺席（不变量 3）。
 - 新增依赖：`kotlinx-coroutines-core`（Flow，全 target 含 wasmJs）。不引入 kotlinx-datetime、kotlinx-serialization。
 - 版本目录新增：coroutines、SQLDelight（plugin + android/native drivers）、Robolectric。具体版本按 [toolchain policy](../../../CONTEXT.md) 的「兼容交集」原则在计划阶段锁定并验证（Kotlin 2.4.10 / AGP 9.1.0 / Gradle 9.3.1）。
@@ -211,6 +211,8 @@ CREATE INDEX task_by_archived ON task(archived_at);
 ```
 
 SQL 三端共用一个 `SqlDelightTaskBoardRepository(schema, driver)` 实现（commonMain 基于生成查询写一次），平台源集只差 driver 构造（`AndroidSqliteDriver` / `NativeSqliteDriver`）。
+
+iOS 接线修正（Task 17）：`LocalDataSql.framework` 以 `export(project(":shared:task-board"))` + `transitiveExport = true` 导出 task-board（app 只链接这一个静态 framework，规避 K/N 双运行时崩溃）；export 要求导出项目及其传递依赖为 API 依赖（task-board 的 coroutines-core、local-data-sql 的 task-board 均为 `api`）；sqldelight native driver 的 sqlite3 cinterop 在 iOS 无 linkerOpts 且静态 framework 不传播 linkerOpts，app 侧 `OTHER_LDFLAGS: -lsqlite3` 自链系统 sqlite3。Swift 侧经 `TaskBoardRepositoryFactories_iosKt.taskBoardRepository(name:)` 取工厂（文件 `TaskBoardRepositoryFactories.ios.kt` 的 ObjC 导出名；K/N 不生成默认参数重载，须显式传 name）。
 
 ### 6.4 IndexedDB 实现（`local-data-web`）
 

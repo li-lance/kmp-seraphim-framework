@@ -1,5 +1,4 @@
 import SwiftUI
-import TaskBoardShared
 import LocalDataSql
 
 struct ContentView: View {
@@ -10,7 +9,7 @@ struct ContentView: View {
     init() {
         self.adapter = TaskBoardIosAdapter(
             store: TaskBoardStore(
-                repository: TaskBoardRepositoryFactories_iosKt.taskBoardRepository(name: "daily-board.db") as! TaskBoardRepository
+                repository: TaskBoardRepositoryFactories_iosKt.taskBoardRepository(name: "daily-board.db")
             )
         )
     }

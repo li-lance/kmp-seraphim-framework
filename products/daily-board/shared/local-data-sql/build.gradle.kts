@@ -32,17 +32,24 @@ kotlin {
         binaries.framework {
             baseName = "LocalDataSql"
             isStatic = true
+            // K/N 单运行时：task-board 经 export 并入 LocalDataSql.framework（Task 17 修正）
+            export(project(":shared:task-board"))
+            transitiveExport = true
         }
     }
     iosSimulatorArm64 {
         binaries.framework {
             baseName = "LocalDataSql"
             isStatic = true
+            // K/N 单运行时：task-board 经 export 并入 LocalDataSql.framework（Task 17 修正）
+            export(project(":shared:task-board"))
+            transitiveExport = true
         }
     }
     sourceSets {
         commonMain.dependencies {
-            implementation(project(":shared:task-board"))
+            // api：task-board 被本模块的 framework export，导出项目须为 API 依赖（K/N 单运行时修正）
+            api(project(":shared:task-board"))
             implementation(libs.sqldelight.runtime)
         }
         commonTest.dependencies {

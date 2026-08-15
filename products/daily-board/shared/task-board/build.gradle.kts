@@ -25,7 +25,8 @@ kotlin {
     }
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.kotlinx.coroutines.core)
+            // api：task-board 被 LocalDataSql.framework export，传递依赖须为 API 可见（K/N 单运行时修正）
+            api(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
