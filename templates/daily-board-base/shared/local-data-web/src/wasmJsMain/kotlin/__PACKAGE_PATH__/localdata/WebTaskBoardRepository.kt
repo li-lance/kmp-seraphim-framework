@@ -49,6 +49,7 @@ class WebTaskBoardRepository(private val factory: IdbFactory) : TaskBoardReposit
     override suspend fun apply(deltas: List<BoardDelta>) {
         val db = database ?: throw BoardError.NotOpen()
         val transaction = db.transaction(storeNamesArray(COLUMNS_STORE, TASKS_STORE), "readwrite")
+        val guard = TransactionGuard()
         try {
             val columns = transaction.objectStore(COLUMNS_STORE)
             val tasks = transaction.objectStore(TASKS_STORE)
@@ -73,9 +74,12 @@ class WebTaskBoardRepository(private val factory: IdbFactory) : TaskBoardReposit
                     is BoardDelta.DeleteTask -> tasks.delete(delta.id.value.toDouble())
                 }
             }
-            awaitCompletion(transaction)
+            awaitCompletion(transaction, guard)
         } catch (failure: Throwable) {
-            transaction.abort()
+            // Only abort while the transaction is still active: real IndexedDB fires
+            // onerror then onabort, and aborting an already-inactive transaction
+            // would mask the original error with an InvalidStateError.
+            if (guard.active) transaction.abort()
             throw failure
         }
     }
@@ -122,12 +126,25 @@ class WebTaskBoardRepository(private val factory: IdbFactory) : TaskBoardReposit
             request.onerror = { continuation.resumeWithException(StorageError("indexedDB request failed")) }
         }
 
-    private suspend fun awaitCompletion(transaction: IdbTransaction) {
+    private suspend fun awaitCompletion(transaction: IdbTransaction, guard: TransactionGuard) {
         suspendCancellableCoroutine { continuation ->
-            transaction.oncomplete = { continuation.resume(Unit) }
-            transaction.onabort = { continuation.resumeWithException(StorageError("indexedDB transaction aborted")) }
-            transaction.onerror = { continuation.resumeWithException(StorageError("indexedDB transaction failed")) }
+            // Real browsers fire transaction.onerror and then onabort; resume only once.
+            var fired = false
+            fun settle(throwable: Throwable?) {
+                if (fired) return
+                fired = true
+                guard.active = false
+                if (throwable == null) continuation.resume(Unit)
+                else continuation.resumeWithException(throwable)
+            }
+            transaction.oncomplete = { settle(null) }
+            transaction.onabort = { settle(StorageError("indexedDB transaction aborted")) }
+            transaction.onerror = { settle(StorageError("indexedDB transaction failed")) }
         }
+    }
+
+    private class TransactionGuard {
+        var active = true
     }
 }
 
